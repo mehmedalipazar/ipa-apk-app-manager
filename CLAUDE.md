@@ -11,8 +11,9 @@ npm workspaces monorepo: `backend` (Fastify API) + `frontend` (React SPA).
 `README.md` is the authoritative user/operator documentation (Turkish) — read it before changing
 deployment, env, or link-lifetime behavior.
 
-> **This repo is not under version control** (`git init` has never been run). There is no rollback.
-> The pre-v2 source tree is archived at `../ipa-ota-download-v1-yedek/`.
+> **Under version control since 2026-08-10.** Code can be rolled back via git, but **data cannot**:
+> `data-docker/` and `backend/data/` are gitignored — back them up separately before destructive
+> operations. The pre-v2 source tree is archived at `../ipa-ota-download-v1-yedek/`.
 
 ## Commands
 
