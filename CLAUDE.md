@@ -242,9 +242,23 @@ while a real environment variable beats every file** (verified, not assumed).
 Desktop's Linux VM and cannot be opened from macOS. With the bind mount:
 
 ```bash
-sqlite3 data-docker/ipa-ota.db "select app_name, version, expires_at from builds;"
+sqlite3 data-docker/ipa-ota.db "select app_name, version, expires_at from builds;"   # ONLY while api is stopped
 sqlite3 backend/data/ipa-ota.db "..."        # local dev
 ```
+
+> **WARNING — host `sqlite3` against the LIVE database has destroyed data (2026-08-10).**
+> POSIX file locks do not propagate across Docker Desktop's bind mount, so a host-side
+> connection believes it is alone: on close it checkpoints and truncates the WAL, silently
+> discarding commits the container made (a build row was lost this way and had to be
+> restored by hand). While the api container runs, read the DB only from inside it:
+>
+> ```bash
+> docker compose exec -T api node -e 'const {DatabaseSync}=require("node:sqlite");
+>   const db=new DatabaseSync("/data/ipa-ota.db",{readOnly:true});
+>   console.log(db.prepare("select app_name, version from builds").all());'
+> ```
+>
+> Host `sqlite3` is safe only after `docker compose stop api`.
 
 SQLite runs in **WAL mode**. If you copy the database elsewhere, copy `ipa-ota.db-wal` and
 `ipa-ota.db-shm` too — the `.db` file alone is missing the most recent writes. **Back up

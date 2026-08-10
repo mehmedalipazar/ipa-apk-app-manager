@@ -148,7 +148,15 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/*
+        noValidate: dogrulamanin TEK otoritesi sunucudaki sema. Tarayicinin
+        kendi kontrolu devrede kalirsa gonderimi sessizce engelliyor, mesaji
+        kendi dilinde gosteriyor ve alan bazli Turkce hatalarimiz hic
+        gorunmuyor. min/max nitelikleri yine duruyor — araliklar ve artir/azalt
+        oklari icin.
+      */}
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void kaydet();
