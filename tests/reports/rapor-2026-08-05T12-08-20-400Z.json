@@ -1,0 +1,727 @@
+{
+  "tarih": "2026-08-05T12:08:20.400Z",
+  "taban": "http://localhost:5173",
+  "sonuclar": [
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A2",
+      "baslik": "PORT okunuyor (belirtilen portta dinliyor)",
+      "gecti": true,
+      "detay": "port 56280 dinleniyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A3",
+      "baslik": "HOST okunuyor (127.0.0.1 disina acilmiyor)",
+      "gecti": true,
+      "detay": "192.168.20.91:56285 kapali, loopback acik"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A4",
+      "baslik": "DATA_DIR okunuyor (DB ve uploads orada olusuyor)",
+      "gecti": true,
+      "detay": "ipa-ota.db, ipa-ota.db-shm, ipa-ota.db-wal"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A5",
+      "baslik": "LOG_LEVEL okunuyor (debug vs fatal cikti farki)",
+      "gecti": true,
+      "detay": "debug=1161B  fatal=0B"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A6",
+      "baslik": "TRUST_PROXY okunuyor (X-Forwarded-For yorumlaniyor)",
+      "gecti": true,
+      "detay": "true→203.0.113.77 loglandi, false→loglanmadi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A7",
+      "baslik": "PUBLIC_BASE_URL temiz DB de config.baseUrl a aktariliyor",
+      "gecti": true,
+      "detay": "env → DB bosken okundu"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A8",
+      "baslik": "PUBLIC_BASE_URL, DB de deger varken YOK SAYILIYOR (bilincli)",
+      "gecti": true,
+      "detay": "DB > env onceligi dogru"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A9",
+      "baslik": "PUBLIC_BASE_URL sondaki / karakterleri kirpiliyor",
+      "gecti": true,
+      "detay": "kirpma calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A10",
+      "baslik": "ADMIN_PASSWORD ilk acilista okunuyor (giris yapilabiliyor)",
+      "gecti": true,
+      "detay": "giris basarili"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A11",
+      "baslik": "ADMIN_PASSWORD sonraki aciliste YOK SAYILIYOR (panelden degisen sifre korunur)",
+      "gecti": true,
+      "detay": "env sifre restart ta geri gelmiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A12",
+      "baslik": "ADMIN_PASSWORD_FORCE_RESET=true env sifresini geri yukluyor",
+      "gecti": true,
+      "detay": "sifirlama calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A13",
+      "baslik": "ADMIN_PASSWORD 12 karakterden kisa ise acilista hata",
+      "gecti": true,
+      "detay": "acilista reddedildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A14",
+      "baslik": "SESSION_SECRET degisimi aktif oturumlari dusuruyor",
+      "gecti": true,
+      "detay": "oturum gecersiz kilindi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A16",
+      "baslik": "NODE_ENV=production + SESSION_SECRET yok → acilista hata",
+      "gecti": true,
+      "detay": "prod korumasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A17",
+      "baslik": "NODE_ENV=development + SESSION_SECRET yok → uyari ile kalkiyor",
+      "gecti": true,
+      "detay": "gecici anahtar uretildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A16b",
+      "baslik": "NODE_ENV=production + ADMIN_PASSWORD yok → acilista hata",
+      "gecti": true,
+      "detay": "prod korumasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A18",
+      "baslik": "Gecersiz LOG_LEVEL acilista reddediliyor",
+      "gecti": true,
+      "detay": "zod dogrulamasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A19",
+      "baslik": "Gecersiz PORT acilista reddediliyor",
+      "gecti": true,
+      "detay": "aralik dogrulamasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A20",
+      "baslik": "NODE_ENV log bicimini degistiriyor (dev: pretty, prod: JSON)",
+      "gecti": true,
+      "detay": "prod=JSON, dev=pretty"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A21",
+      "baslik": "WEB_DIST okunuyor (yanlis yol → SPA yok, API calisir)",
+      "gecti": true,
+      "detay": "uyari verildi, API ayakta"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A22",
+      "baslik": "Bilinmeyen ortam degiskeni yok sayiliyor",
+      "gecti": true,
+      "detay": "yok sayildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A1",
+      "baslik": "Yukleme sirasi: .env → .env.local → shell (shell kazanir)",
+      "gecti": false,
+      "detay": "Sirayi kanitlayacak farkli deger yok (.env=http://localhost:5173, .env.local=http://localhost:5173)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B1",
+      "baslik": "${VAR} ifadeleri host .env dosyasindan cozuluyor",
+      "gecti": true,
+      "detay": "PUBLIC_BASE_URL=http://localhost:5173 yerine gecmis"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B2",
+      "baslik": "${LOG_LEVEL:-info} varsayilani uygulaniyor",
+      "gecti": true,
+      "detay": "LOG_LEVEL=info, TRUST_PROXY=true, ADMIN_PASSWORD_FORCE_RESET=false"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B3",
+      "baslik": "ADMIN_PASSWORD bos birakilirsa compose uyari veriyor",
+      "gecti": true,
+      "detay": "compose \"variable is not set\" uyarisi veriyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B4",
+      "baslik": "Calisan container, host .env dosyasi ile senkron mu (drift tespiti)",
+      "gecti": false,
+      "detay": "Container .env ile senkron degil — \"docker compose up -d\" gerekiyor:\n         PUBLIC_BASE_URL: container=\"https://localhost\" .env=\"http://localhost:5173\""
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B5",
+      "baslik": "Compose ta sabit degerler (.env NODE_ENV/PORT/DATA_DIR) ezilemez",
+      "gecti": true,
+      "detay": "NODE_ENV=production, PORT=3000, DATA_DIR=/data sabit kaldi"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B10",
+      "baslik": "ACME_EMAIL bos iken Caddyfile gecerli mi",
+      "gecti": false,
+      "detay": "ACME_EMAIL bos iken Caddy yapilandirmasi GECERSIZ:\n{\"level\":\"info\",\"ts\":1785931693.9264133,\"msg\":\"using config from file\",\"file\":\"/etc/caddy/Caddyfile\"}\nError: adapting config using caddyfile: parsing caddyfile tokens for 'email': wrong argument count or unexpected line ending after 'email', at /etc/caddy/Caddyfile:14"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9",
+      "baslik": "DOMAIN + ACME_EMAIL dolu iken Caddyfile gecerli",
+      "gecti": true,
+      "detay": "gecerli"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9b",
+      "baslik": "Caddy container i saglikli calisiyor mu (mevcut yigin)",
+      "gecti": false,
+      "detay": "Caddy container i saglikli degil: restarting / Restarting (1) 57 seconds ago"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B12",
+      "baslik": "Healthcheck PORT degiskenini okuyor (container healthy)",
+      "gecti": true,
+      "detay": "health=healthy"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B7",
+      "baslik": ".env degisikligi `up -d` sonrasi container a yansiyor",
+      "gecti": true,
+      "detay": "env degiskeni container a ulasti"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8",
+      "baslik": "Panelden HIC kaydedilmemisken PUBLIC_BASE_URL her aciliste yeniden okunuyor",
+      "gecti": true,
+      "detay": "ilk kayittan once env canli; kayittan sonra DB kilitler (B8b)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8b",
+      "baslik": "Panelden bir kez kaydedildikten sonra DB, PUBLIC_BASE_URL i kilitliyor",
+      "gecti": true,
+      "detay": "kayit sonrasi env yok sayiliyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B6",
+      "baslik": ".env degisikligi yeniden olusturma OLMADAN etkisiz",
+      "gecti": true,
+      "detay": ".env=ucuncu ama container=https://dorduncu.vartest (beklenen)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B11",
+      "baslik": "Volume kaliciligi: down → up sonrasi DB korunuyor",
+      "gecti": true,
+      "detay": "SQLite volume da korundu (baseUrl=https://panelden.vartest)"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C1",
+      "baslik": "Vite proxy /api isteklerini arka uca tasiyor",
+      "gecti": true,
+      "detay": "http://localhost:5173/api → 3000, configured=true"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C2",
+      "baslik": "Vite proxy /healthz ve /i yollarini tasiyor",
+      "gecti": true,
+      "detay": "healthz=200, /i/<yok>=404 (HTML)"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C3",
+      "baslik": "SPA yolu (/admin/ayarlar) arka uca gitmiyor, HTML donuyor",
+      "gecti": true,
+      "detay": "index.html donuyor"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C5",
+      "baslik": "Olmayan /api yolu HTML degil JSON 404 donuyor",
+      "gecti": true,
+      "detay": "404 {\"error\":\"Bulunamadi\"}"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C10",
+      "baslik": "DTO drift: web/src/api.ts AppConfig ↔ sunucu semasi birebir",
+      "gecti": true,
+      "detay": "10 alan eslesti"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C16",
+      "baslik": "Kurulum sayfasi onbelleklenmiyor (cache-control: no-store)",
+      "gecti": true,
+      "detay": "404 sayfasi status=404"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G3",
+      "baslik": "/api/auth/me oturumsuz: authenticated=false, configured=true",
+      "gecti": true,
+      "detay": "{\"authenticated\":false,\"configured\":true,\"expiresAt\":null}"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G5",
+      "baslik": "Korunan uclar oturumsuz 401 donuyor",
+      "gecti": true,
+      "detay": "6 uc korunuyor"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G2",
+      "baslik": "Yanlis sifre 401 donuyor",
+      "gecti": true,
+      "detay": "Sifre hatali."
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G1",
+      "baslik": "Dogru sifre ile giris: 200 + HttpOnly cerez",
+      "gecti": true,
+      "detay": "ipa_ota_session=***; Max-Age=43200; Path=/; HttpOnly; SameSite=Lax"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G6",
+      "baslik": "Kurcalanmis oturum cerezi reddediliyor",
+      "gecti": true,
+      "detay": "imza dogrulamasi calisiyor"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C9",
+      "baslik": "GET /api/settings sozlesmesi: values + fields + warnings",
+      "gecti": true,
+      "detay": "10 alan, gruplar: genel/gorunum/link/yukleme"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C9b",
+      "baslik": "Semadaki her alanin panelde bir `fields` karsiligi var",
+      "gecti": true,
+      "detay": "gizli ayar yok"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C8",
+      "baslik": "Sunucu dogrulama hatasi ustten alta tasinabilir bicimde donuyor",
+      "gecti": true,
+      "detay": "baseUrl: Gecerli bir URL girin"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C13",
+      "baslik": "warnings dizisi hem settings hem upload yanitinda tasiniyor",
+      "gecti": true,
+      "detay": "uyari iki uctan da geliyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1",
+      "baslik": "baseUrl gecerli https kabul ediliyor",
+      "gecti": true,
+      "detay": "kabul"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1b",
+      "baslik": "baseUrl gecersiz bicim reddediliyor",
+      "gecti": true,
+      "detay": "3 gecersiz bicim reddedildi"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1c",
+      "baslik": "baseUrl sonunda / varsa reddediliyor",
+      "gecti": true,
+      "detay": "baseUrl: Adresin sonunda / olmamali"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1d",
+      "baslik": "baseUrl bos birakilabiliyor (uyari ile)",
+      "gecti": true,
+      "detay": "bos + uyari"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D2",
+      "baslik": "siteName: gecerli / bos / 81 karakter",
+      "gecti": true,
+      "detay": "max 80 sinir calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D3",
+      "baslik": "installNote: gecerli / 501 karakter",
+      "gecti": true,
+      "detay": "max 500 sinir calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D4",
+      "baslik": "showQrCode true/false kaydediliyor",
+      "gecti": true,
+      "detay": "boolean dogrulamasi calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D5",
+      "baslik": "defaultTtlHours sinirlari (1..8760)",
+      "gecti": true,
+      "detay": "alt/ust/ondalik sinirlari calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D6",
+      "baslik": "maxTtlHours sinirlari (1..8760)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D6b",
+      "baslik": "maxTtlHours dusurulunce defaultTtlHours otomatik kirpiliyor",
+      "gecti": true,
+      "detay": "default 168 → 12 olarak kirpildi"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D7",
+      "baslik": "purgeAfterExpiryHours sinirlari (0..8760)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D8",
+      "baslik": "signedUrlTtlMinutes sinirlari (5..1440)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D8b",
+      "baslik": "signedUrlTtlMinutes uretilen imzanin omrunu degistiriyor",
+      "gecti": true,
+      "detay": "imza omru farki 1435 dk"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D9",
+      "baslik": "maxUploadMb sinirlari (1..8192)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D9b",
+      "baslik": "maxUploadMb gercekten uygulaniyor (buyuk dosya 413)",
+      "gecti": true,
+      "detay": "Dosya cok buyuk. En fazla 1 MB yuklenebilir."
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D10",
+      "baslik": "revokePreviousOnUpload true/false kaydediliyor",
+      "gecti": true,
+      "detay": "kaydediliyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-kalicilik",
+      "baslik": "Ayarlar sunucu yeniden baslatildiginda korunuyor (DB)",
+      "gecti": true,
+      "detay": "DB den geri okundu"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-kismi",
+      "baslik": "PUT kismi govde kabul ediyor, gonderilmeyen alanlar korunuyor",
+      "gecti": true,
+      "detay": "partial update calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-bilinmeyen",
+      "baslik": "Bilinmeyen ayar anahtari sessizce yok sayiliyor",
+      "gecti": true,
+      "detay": "yok sayildi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F2",
+      "baslik": "Gecerli IPA yukleniyor, meta veri dogru cikariliyor",
+      "gecti": true,
+      "detay": "DemoA 1.0.0 (61.5 KB)"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F3",
+      "baslik": "Simge cikariliyor ve imzali adresten indirilebiliyor",
+      "gecti": true,
+      "detay": "292 bayt PNG"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F4",
+      "baslik": "DTO.installUrl = paylasilabilir sayfa adresi; itms-services linki sayfanin icinde",
+      "gecti": true,
+      "detay": "https://ota.test/i/msZBFa9hn25txYj9CYq7YK/manifest.plist?k=1785938899862..."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F4b",
+      "baslik": "iOS DISI istemciye kurulum dugmesi gosterilmiyor (uyari sayfasi)",
+      "gecti": true,
+      "detay": "UA ayrimi calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5",
+      "baslik": "Kurulum sayfasi: siteName + installNote + QR gorunuyor",
+      "gecti": true,
+      "detay": "5187 bayt (iOS), QR masaustunde"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5b",
+      "baslik": "showQrCode ayari masaustu goruntusundeki QR yi ac/kapa yapiyor",
+      "gecti": true,
+      "detay": "ayar masaustu goruntusunu degistiriyor, qr.svg 200"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5c",
+      "baslik": "siteName degisikligi kurulum sayfasina aninda yansiyor",
+      "gecti": true,
+      "detay": "cache tazelenmesi calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F6",
+      "baslik": "manifest.plist: imzali 200 / imzasiz 403 / bozuk imza 403",
+      "gecti": true,
+      "detay": "200 / 403 / 403"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F7",
+      "baslik": ".ipa indirme: imzali 200, content-disposition dogru",
+      "gecti": true,
+      "detay": "63026 bayt indirildi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F8",
+      "baslik": "Range destegi: bytes=0-1023 → 206 + content-range",
+      "gecti": true,
+      "detay": "206 + content-range dogru"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F9",
+      "baslik": "Sayaclar artiyor (view / install / download)",
+      "gecti": true,
+      "detay": "view=11 install=3 download=4"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F10",
+      "baslik": "Sifreli link: sifresiz form, dogru sifrede kurulum linki",
+      "gecti": true,
+      "detay": "sifre korumasi calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F11",
+      "baslik": "Iptal (revoke): kurulum sayfasi 410, manifest 410",
+      "gecti": true,
+      "detay": "410 donuyor, link gizlendi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F12",
+      "baslik": "Yeniden ac (unrevoke): tekrar aktif",
+      "gecti": true,
+      "detay": "yeniden aktif"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F13",
+      "baslik": "Suresi dolmus link 410 donuyor",
+      "gecti": true,
+      "detay": "expired durumu dogru"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F14",
+      "baslik": "Temizlik: suresi dolmus dosyalar siliniyor, kayit \"purged\" oluyor",
+      "gecti": true,
+      "detay": "2 kayit, 191588 bayt"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F15",
+      "baslik": "Kalici silme: kayit ve dosya gidiyor, 404",
+      "gecti": true,
+      "detay": "tamamen silindi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F16",
+      "baslik": "revokePreviousOnUpload: ayni bundle-id nin eskisi iptal ediliyor",
+      "gecti": true,
+      "detay": "ayar iki yonde de calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F17",
+      "baslik": "baseUrl bosken yukleme calisir ama installUrl null + uyari",
+      "gecti": true,
+      "detay": "201 + null link + uyari + 503"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F18",
+      "baslik": "ZIP olmayan dosya 422 ile reddediliyor",
+      "gecti": true,
+      "detay": "Dosya acilamadi — gecerli bir ZIP/IPA arsivi degil."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F18b",
+      "baslik": "Gecerli ZIP ama Payload/*.app yoksa 422",
+      "gecti": true,
+      "detay": "Bu bir iOS uygulamasi (.ipa) degil — arsiv icinde Payload/<uygulama>.a"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F19",
+      "baslik": "Bos dosya 400 ile reddediliyor",
+      "gecti": true,
+      "detay": "Bos dosya yuklendi."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F20",
+      "baslik": "Yanlis uzanti 400 ile reddediliyor",
+      "gecti": true,
+      "detay": "Yalnizca .ipa uzantili dosyalar yuklenebilir."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F22",
+      "baslik": "Yetkisiz yukleme 401",
+      "gecti": true,
+      "detay": "Oturum gerekli. Lutfen giris yapin."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-ttl-clamp",
+      "baslik": "Yuklemede maxTtlHours asilirsa sessizce kirpiliyor",
+      "gecti": true,
+      "detay": "9999 → 48, bos → 24"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-extend",
+      "baslik": "Sure duzenleme: ttlFrom upload / now",
+      "gecti": true,
+      "detay": "iki baz da dogru"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-patch-sifre",
+      "baslik": "Link sifresi PATCH ile eklenip kaldirilabiliyor",
+      "gecti": true,
+      "detay": "ekle/kaldir calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-liste",
+      "baslik": "Liste: arama, sadece-aktif filtresi, sayfalama",
+      "gecti": true,
+      "detay": "toplam=3, aktif=1"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-stats",
+      "baslik": "/api/stats ozet dogru",
+      "gecti": true,
+      "detay": "total=3 active=1"
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7",
+      "baslik": "Sifre degisimi sonrasi eski sifre calismiyor",
+      "gecti": true,
+      "detay": "eski sifre gecersiz"
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7b",
+      "baslik": "Yanlis mevcut sifre ile degisim reddediliyor",
+      "gecti": true,
+      "detay": "Mevcut sifre hatali."
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7c",
+      "baslik": "Kisa yeni sifre reddediliyor",
+      "gecti": true,
+      "detay": "Yeni sifre en az 8 karakter olmali."
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G4",
+      "baslik": "Cikis: cerez silinir, korunan uc 401",
+      "gecti": true,
+      "detay": "oturum kapandi"
+    }
+  ]
+}

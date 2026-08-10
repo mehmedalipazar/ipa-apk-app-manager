@@ -1,0 +1,104 @@
+{
+  "tarih": "2026-08-05T11:57:02.916Z",
+  "taban": "http://localhost:5173",
+  "sonuclar": [
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B1",
+      "baslik": "${VAR} ifadeleri host .env dosyasindan cozuluyor",
+      "gecti": true,
+      "detay": "PUBLIC_BASE_URL=http://localhost:5173 yerine gecmis"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B2",
+      "baslik": "${LOG_LEVEL:-info} varsayilani uygulaniyor",
+      "gecti": true,
+      "detay": "LOG_LEVEL=info, TRUST_PROXY=true, ADMIN_PASSWORD_FORCE_RESET=false"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B3",
+      "baslik": "ADMIN_PASSWORD bos birakilirsa compose uyari veriyor",
+      "gecti": true,
+      "detay": "compose \"variable is not set\" uyarisi veriyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B4",
+      "baslik": "Compose degerleri calisan container icinde birebir gorunuyor",
+      "gecti": false,
+      "detay": "PUBLIC_BASE_URL container icinde beklenen=\"http://localhost:5173\" gercek=\"https://localhost\""
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B5",
+      "baslik": "Compose ta sabit degerler (.env NODE_ENV/PORT/DATA_DIR) ezilemez",
+      "gecti": true,
+      "detay": "NODE_ENV=production, PORT=3000, DATA_DIR=/data sabit kaldi"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B10",
+      "baslik": "ACME_EMAIL bos iken Caddyfile gecerli mi",
+      "gecti": false,
+      "detay": "ACME_EMAIL bos iken Caddy yapilandirmasi GECERSIZ:\n{\"level\":\"info\",\"ts\":1785931018.1024284,\"msg\":\"using config from file\",\"file\":\"/etc/caddy/Caddyfile\"}\nError: adapting config using caddyfile: parsing caddyfile tokens for 'email': wrong argument count or unexpected line ending after 'email', at /etc/caddy/Caddyfile:14"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9",
+      "baslik": "DOMAIN + ACME_EMAIL dolu iken Caddyfile gecerli",
+      "gecti": true,
+      "detay": "gecerli"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9b",
+      "baslik": "Caddy container i saglikli calisiyor mu (mevcut yigin)",
+      "gecti": false,
+      "detay": "Caddy container i saglikli degil: restarting / Restarting (1) 43 seconds ago"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B12",
+      "baslik": "Healthcheck PORT degiskenini okuyor (container healthy)",
+      "gecti": true,
+      "detay": "health=healthy"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B7",
+      "baslik": ".env degisikligi `up -d` sonrasi container a yansiyor",
+      "gecti": true,
+      "detay": "env degiskeni container a ulasti"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8",
+      "baslik": "Panelden HIC kaydedilmemisken PUBLIC_BASE_URL her aciliste yeniden okunuyor",
+      "gecti": true,
+      "detay": "ilk kayittan once env canli; kayittan sonra DB kilitler (B8b)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8b",
+      "baslik": "Panelden bir kez kaydedildikten sonra DB, PUBLIC_BASE_URL i kilitliyor",
+      "gecti": true,
+      "detay": "kayit sonrasi env yok sayiliyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B6",
+      "baslik": ".env degisikligi yeniden olusturma OLMADAN etkisiz",
+      "gecti": false,
+      "detay": "container hala eski degeri tasimali beklenen=\"https://ikinci.vartest\" gercek=\"https://dorduncu.vartest\""
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B11",
+      "baslik": "Volume kaliciligi: down → up sonrasi DB korunuyor",
+      "gecti": true,
+      "detay": "SQLite volume da korundu (baseUrl=https://panelden.vartest)"
+    }
+  ]
+}

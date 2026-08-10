@@ -1,0 +1,461 @@
+{
+  "tarih": "2026-08-05T11:54:04.546Z",
+  "taban": "http://localhost:5173",
+  "sonuclar": [
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C1",
+      "baslik": "Vite proxy /api isteklerini arka uca tasiyor",
+      "gecti": true,
+      "detay": "http://localhost:5173/api → 3000, configured=true"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C2",
+      "baslik": "Vite proxy /healthz ve /i yollarini tasiyor",
+      "gecti": true,
+      "detay": "healthz=200, /i/<yok>=404 (HTML)"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C3",
+      "baslik": "SPA yolu (/admin/ayarlar) arka uca gitmiyor, HTML donuyor",
+      "gecti": true,
+      "detay": "index.html donuyor"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C5",
+      "baslik": "Olmayan /api yolu HTML degil JSON 404 donuyor",
+      "gecti": true,
+      "detay": "404 {\"error\":\"Bulunamadi\"}"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C10",
+      "baslik": "DTO drift: web/src/api.ts AppConfig ↔ sunucu semasi birebir",
+      "gecti": true,
+      "detay": "10 alan eslesti"
+    },
+    {
+      "grup": "C — Backend ↔ Frontend haberlesme",
+      "id": "C16",
+      "baslik": "Kurulum sayfasi onbelleklenmiyor (cache-control: no-store)",
+      "gecti": true,
+      "detay": "404 sayfasi status=404"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G3",
+      "baslik": "/api/auth/me oturumsuz: authenticated=false, configured=true",
+      "gecti": true,
+      "detay": "{\"authenticated\":false,\"configured\":true,\"expiresAt\":null}"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G5",
+      "baslik": "Korunan uclar oturumsuz 401 donuyor",
+      "gecti": true,
+      "detay": "6 uc korunuyor"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G2",
+      "baslik": "Yanlis sifre 401 donuyor",
+      "gecti": true,
+      "detay": "Sifre hatali."
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G1",
+      "baslik": "Dogru sifre ile giris: 200 + HttpOnly cerez",
+      "gecti": true,
+      "detay": "ipa_ota_session=***; Max-Age=43200; Path=/; HttpOnly; SameSite=Lax"
+    },
+    {
+      "grup": "G — Kimlik dogrulama",
+      "id": "G6",
+      "baslik": "Kurcalanmis oturum cerezi reddediliyor",
+      "gecti": true,
+      "detay": "imza dogrulamasi calisiyor"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C9",
+      "baslik": "GET /api/settings sozlesmesi: values + fields + warnings",
+      "gecti": true,
+      "detay": "10 alan, gruplar: genel/gorunum/link/yukleme"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C9b",
+      "baslik": "Semadaki her alanin panelde bir `fields` karsiligi var",
+      "gecti": true,
+      "detay": "gizli ayar yok"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C8",
+      "baslik": "Sunucu dogrulama hatasi ustten alta tasinabilir bicimde donuyor",
+      "gecti": true,
+      "detay": "baseUrl: Gecerli bir URL girin"
+    },
+    {
+      "grup": "C — Sozlesme (izole sunucu)",
+      "id": "C13",
+      "baslik": "warnings dizisi hem settings hem upload yanitinda tasiniyor",
+      "gecti": true,
+      "detay": "uyari iki uctan da geliyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1",
+      "baslik": "baseUrl gecerli https kabul ediliyor",
+      "gecti": true,
+      "detay": "kabul"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1b",
+      "baslik": "baseUrl gecersiz bicim reddediliyor",
+      "gecti": true,
+      "detay": "3 gecersiz bicim reddedildi"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1c",
+      "baslik": "baseUrl sonunda / varsa reddediliyor",
+      "gecti": true,
+      "detay": "baseUrl: Adresin sonunda / olmamali"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D1d",
+      "baslik": "baseUrl bos birakilabiliyor (uyari ile)",
+      "gecti": true,
+      "detay": "bos + uyari"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D2",
+      "baslik": "siteName: gecerli / bos / 81 karakter",
+      "gecti": true,
+      "detay": "max 80 sinir calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D3",
+      "baslik": "installNote: gecerli / 501 karakter",
+      "gecti": true,
+      "detay": "max 500 sinir calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D4",
+      "baslik": "showQrCode true/false kaydediliyor",
+      "gecti": true,
+      "detay": "boolean dogrulamasi calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D5",
+      "baslik": "defaultTtlHours sinirlari (1..8760)",
+      "gecti": true,
+      "detay": "alt/ust/ondalik sinirlari calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D6",
+      "baslik": "maxTtlHours sinirlari (1..8760)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D6b",
+      "baslik": "maxTtlHours dusurulunce defaultTtlHours otomatik kirpiliyor",
+      "gecti": true,
+      "detay": "default 168 → 12 olarak kirpildi"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D7",
+      "baslik": "purgeAfterExpiryHours sinirlari (0..8760)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D8",
+      "baslik": "signedUrlTtlMinutes sinirlari (5..1440)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D8b",
+      "baslik": "signedUrlTtlMinutes uretilen imzanin omrunu degistiriyor",
+      "gecti": false,
+      "detay": "Cannot read properties of null (reading '1')"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D9",
+      "baslik": "maxUploadMb sinirlari (1..8192)",
+      "gecti": true,
+      "detay": "sinirlar calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D9b",
+      "baslik": "maxUploadMb gercekten uygulaniyor (buyuk dosya 413)",
+      "gecti": true,
+      "detay": "Dosya cok buyuk. En fazla 1 MB yuklenebilir."
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D10",
+      "baslik": "revokePreviousOnUpload true/false kaydediliyor",
+      "gecti": true,
+      "detay": "kaydediliyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-kalicilik",
+      "baslik": "Ayarlar sunucu yeniden baslatildiginda korunuyor (DB)",
+      "gecti": true,
+      "detay": "DB den geri okundu"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-kismi",
+      "baslik": "PUT kismi govde kabul ediyor, gonderilmeyen alanlar korunuyor",
+      "gecti": true,
+      "detay": "partial update calisiyor"
+    },
+    {
+      "grup": "D — Ayar alanlari (dogrulama + davranis)",
+      "id": "D-bilinmeyen",
+      "baslik": "Bilinmeyen ayar anahtari sessizce yok sayiliyor",
+      "gecti": true,
+      "detay": "yok sayildi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F2",
+      "baslik": "Gecerli IPA yukleniyor, meta veri dogru cikariliyor",
+      "gecti": true,
+      "detay": "DemoA 1.0.0 (61.5 KB)"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F3",
+      "baslik": "Simge cikariliyor ve imzali adresten indirilebiliyor",
+      "gecti": true,
+      "detay": "292 bayt PNG"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F4",
+      "baslik": "Kurulum linki itms-services bicimi + imzali manifest adresi",
+      "gecti": false,
+      "detay": "https://ota.test/i/isxe9D4a2MxGwhfJvKNvrG"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5",
+      "baslik": "Kurulum sayfasi: siteName + installNote + QR gorunuyor",
+      "gecti": false,
+      "detay": "kurulum linki yok"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5b",
+      "baslik": "showQrCode=false iken kurulum sayfasinda QR yok",
+      "gecti": true,
+      "detay": "ayar sayfayi degistiriyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F5c",
+      "baslik": "siteName degisikligi kurulum sayfasina aninda yansiyor",
+      "gecti": true,
+      "detay": "cache tazelenmesi calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F6",
+      "baslik": "manifest.plist: imzali 200 / imzasiz 403 / bozuk imza 403",
+      "gecti": false,
+      "detay": "Failed to parse URL from http://127.0.0.1:55786undefined"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F7",
+      "baslik": ".ipa indirme: imzali 200, content-disposition dogru",
+      "gecti": false,
+      "detay": "Failed to parse URL from http://127.0.0.1:55786undefined"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F8",
+      "baslik": "Range destegi: bytes=0-1023 → 206 + content-range",
+      "gecti": false,
+      "detay": "Failed to parse URL from http://127.0.0.1:55786undefined"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F9",
+      "baslik": "Sayaclar artiyor (view / install / download)",
+      "gecti": false,
+      "detay": "install sayaci 0"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F10",
+      "baslik": "Sifreli link: sifresiz form, dogru sifrede kurulum linki",
+      "gecti": false,
+      "detay": "dogru sifrede kurulum linki cikmadi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F11",
+      "baslik": "Iptal (revoke): kurulum sayfasi 410, manifest 410",
+      "gecti": false,
+      "detay": "iptalde installUrl null olmali beklenen=null gercek=\"https://ota.test/i/isxe9D4a2MxGwhfJvKNvrG\""
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F12",
+      "baslik": "Yeniden ac (unrevoke): tekrar aktif",
+      "gecti": true,
+      "detay": "yeniden aktif"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F13",
+      "baslik": "Suresi dolmus link 410 donuyor",
+      "gecti": false,
+      "detay": "installUrl beklenen=null gercek=\"https://ota.test/i/muD8D4H2zaUcbwk4dzeG9P\""
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F14",
+      "baslik": "Temizlik: suresi dolmus dosyalar siliniyor, kayit \"purged\" oluyor",
+      "gecti": true,
+      "detay": "2 kayit, 191588 bayt"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F15",
+      "baslik": "Kalici silme: kayit ve dosya gidiyor, 404",
+      "gecti": true,
+      "detay": "tamamen silindi"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F16",
+      "baslik": "revokePreviousOnUpload: ayni bundle-id nin eskisi iptal ediliyor",
+      "gecti": true,
+      "detay": "ayar iki yonde de calisiyor"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F17",
+      "baslik": "baseUrl bosken yukleme calisir ama installUrl null + uyari",
+      "gecti": true,
+      "detay": "201 + null link + uyari + 503"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F18",
+      "baslik": "Bozuk IPA 422 ile reddediliyor",
+      "gecti": false,
+      "detay": "Dosya acilamadi — gecerli bir ZIP/IPA arsivi degil."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F19",
+      "baslik": "Bos dosya 400 ile reddediliyor",
+      "gecti": true,
+      "detay": "Bos dosya yuklendi."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F20",
+      "baslik": "Yanlis uzanti 400 ile reddediliyor",
+      "gecti": true,
+      "detay": "Yalnizca .ipa uzantili dosyalar yuklenebilir."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F22",
+      "baslik": "Yetkisiz yukleme 401",
+      "gecti": true,
+      "detay": "Oturum gerekli. Lutfen giris yapin."
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-ttl-clamp",
+      "baslik": "Yuklemede maxTtlHours asilirsa sessizce kirpiliyor",
+      "gecti": true,
+      "detay": "9999 → 48, bos → 24"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-extend",
+      "baslik": "Sure duzenleme: ttlFrom upload / now",
+      "gecti": true,
+      "detay": "iki baz da dogru"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-patch-sifre",
+      "baslik": "Link sifresi PATCH ile eklenip kaldirilabiliyor",
+      "gecti": false,
+      "detay": "sifre kalkmasina ragmen link yok"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-liste",
+      "baslik": "Liste: arama, sadece-aktif filtresi, sayfalama",
+      "gecti": true,
+      "detay": "toplam=6, aktif=3"
+    },
+    {
+      "grup": "F — Uctan uca OTA akisi",
+      "id": "F-stats",
+      "baslik": "/api/stats ozet dogru",
+      "gecti": true,
+      "detay": "total=6 active=3"
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7",
+      "baslik": "Sifre degisimi sonrasi eski sifre calismiyor",
+      "gecti": true,
+      "detay": "eski sifre gecersiz"
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7b",
+      "baslik": "Yanlis mevcut sifre ile degisim reddediliyor",
+      "gecti": true,
+      "detay": "Mevcut sifre hatali."
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G7c",
+      "baslik": "Kisa yeni sifre reddediliyor",
+      "gecti": true,
+      "detay": "Yeni sifre en az 8 karakter olmali."
+    },
+    {
+      "grup": "G — Kimlik (devam)",
+      "id": "G4",
+      "baslik": "Cikis: cerez silinir, korunan uc 401",
+      "gecti": true,
+      "detay": "oturum kapandi"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+coverage/
+
+# --- Veri (SQLite + yuklenen IPA'lar) ----------------------------------------
+# backend/data       : yerel gelistirme
+# data-docker        : docker compose bind mount
+data/
+data-docker/
+
+# --- Ortam dosyalari ----------------------------------------------------------
+# .env.development ve .env.production DEPOYA GIRER (sir icermezler).
+# Sirlar ve makineye ozel degerler yalnizca .env.local dosyalarindadir.
+.env
+.env.local
+.env.*.local

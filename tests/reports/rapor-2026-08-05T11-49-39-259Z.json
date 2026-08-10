@@ -1,0 +1,97 @@
+{
+  "tarih": "2026-08-05T11:49:39.260Z",
+  "taban": "http://localhost:5173",
+  "sonuclar": [
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B1",
+      "baslik": "${VAR} ifadeleri host .env dosyasindan cozuluyor",
+      "gecti": true,
+      "detay": "PUBLIC_BASE_URL=https://localhost yerine gecmis"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B2",
+      "baslik": "${LOG_LEVEL:-info} varsayilani uygulaniyor",
+      "gecti": true,
+      "detay": "LOG_LEVEL=info, TRUST_PROXY=true, ADMIN_PASSWORD_FORCE_RESET=false"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B3",
+      "baslik": "ADMIN_PASSWORD bos birakilirsa compose uyari veriyor",
+      "gecti": false,
+      "detay": "Compose uyarisi bekleniyordu:\nname: ipa-ota-download\nservices:\n  app:\n    build:\n      context: /Users/senolpazar/Desktop/Projects/ipa-ota-download\n      dockerfile: Dockerfile\n    environment:\n      ADMIN_PASSWORD: \"\"\n      ADMIN_PASSWORD_FORCE_RESET: \"false\"\n      DATA_DIR: /data\n      LOG_LEVEL: info\n      NODE_ENV: production\n      PORT: \"3000\"\n      PUBLIC_BASE_URL: https://x.test\n      SESSION_SECRET: def\n      TRUST_PRO"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B4",
+      "baslik": "Compose degerleri calisan container icinde birebir gorunuyor",
+      "gecti": true,
+      "detay": "PUBLIC_BASE_URL / ADMIN_PASSWORD / SESSION_SECRET esit"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B5",
+      "baslik": "Compose ta sabit degerler (.env NODE_ENV/PORT/DATA_DIR) ezilemez",
+      "gecti": true,
+      "detay": "NODE_ENV=production, PORT=3000, DATA_DIR=/data sabit kaldi"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B10",
+      "baslik": "ACME_EMAIL bos iken Caddyfile gecerli mi",
+      "gecti": false,
+      "detay": "ACME_EMAIL bos iken Caddy yapilandirmasi GECERSIZ:\n{\"level\":\"info\",\"ts\":1785930575.2585204,\"msg\":\"using config from file\",\"file\":\"/etc/caddy/Caddyfile\"}\nError: adapting config using caddyfile: parsing caddyfile tokens for 'email': wrong argument count or unexpected line ending after 'email', at /etc/caddy/Caddyfile:14"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9",
+      "baslik": "DOMAIN + ACME_EMAIL dolu iken Caddyfile gecerli",
+      "gecti": true,
+      "detay": "gecerli"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9b",
+      "baslik": "Caddy container i saglikli calisiyor mu (mevcut yigin)",
+      "gecti": false,
+      "detay": "Caddy container i saglikli degil: restarting / Restarting (1) 21 seconds ago"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B12",
+      "baslik": "Healthcheck PORT degiskenini okuyor (container healthy)",
+      "gecti": true,
+      "detay": "health=healthy"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B7",
+      "baslik": ".env degisikligi `up -d` sonrasi container a yansiyor",
+      "gecti": true,
+      "detay": "env degiskeni container a ulasti"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8",
+      "baslik": "PUBLIC_BASE_URL degisse de DB deki baseUrl korunuyor",
+      "gecti": false,
+      "detay": "DB deki ilk deger korunmali beklenen=\"https://ilk.vartest\" gercek=\"https://ikinci.vartest\""
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B6",
+      "baslik": ".env degisikligi yeniden olusturma OLMADAN etkisiz",
+      "gecti": true,
+      "detay": "restart olmadan degismiyor (beklenen)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B11",
+      "baslik": "Volume kaliciligi: down → up sonrasi DB korunuyor",
+      "gecti": false,
+      "detay": "baseUrl DB den gelmeli beklenen=\"https://ilk.vartest\" gercek=\"https://ikinci.vartest\""
+    }
+  ]
+}

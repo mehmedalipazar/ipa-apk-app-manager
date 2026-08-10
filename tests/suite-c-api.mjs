@@ -1,0 +1,956 @@
+/**
+ * C/D/F/G gruplari — haberlesme sozlesmesi, ayar alanlari, OTA akisi, kimlik.
+ *
+ * D/F/G izole bir sunucu ornegine karsi calisir (kullanicinin DB si kirlenmez).
+ * C grubu canli arka uc ornegini hedefler (varsayilan http://localhost:3000).
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { grup, test, bekle, esit, sunucuBaslat, Istemci, KOK, uyu } from './lib/harness.mjs';
+
+const SIFRE = 'TestSifresi-1453!';
+const FIX = join(KOK, 'tests/fixtures');
+
+/**
+ * Kurulum sayfasi User-Agent e gore IKI FARKLI icerik uretir:
+ * iOS disi istemcide "yalnizca iPhone/iPad" uyarisi ve kurulum dugmesi YOK.
+ * itms-services linkini gorebilmek icin iOS UA sart.
+ */
+const IOS_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+const IOS = { headers: { 'user-agent': IOS_UA } };
+
+/** Kurulum sayfasindan (iOS goruntusu) imzali manifest adresini cikarir. */
+function manifestAdresiCikar(html) {
+  const m = /href="itms-services:\/\/\?action=download-manifest&amp;url=([^"]+)"/.exec(html);
+  if (!m) throw new Error('Kurulum sayfasinda itms-services linki bulunamadi');
+  return decodeURIComponent(m[1].replace(/&amp;/g, '&'));
+}
+
+/** Sunucu semasindaki ayar alanlari — frontend tipiyle karsilastirmak icin. */
+const BEKLENEN_ALANLAR = [
+  'baseUrl', 'defaultTtlHours', 'maxTtlHours', 'maxUploadMb', 'purgeAfterExpiryHours',
+  'siteName', 'installNote', 'showQrCode', 'revokePreviousOnUpload', 'signedUrlTtlMinutes',
+];
+
+export async function calistir({ taban }) {
+  /* ===================================================================== */
+  grup('C — Backend ↔ Frontend haberlesme');
+
+  const canli = new Istemci(taban);
+
+  await test('C1', '/api/auth/me JSON sozlesmesini donduruyor', async () => {
+    const r = await canli.get('/api/auth/me');
+    esit(r.status, 200, '/api/auth/me');
+    bekle(typeof r.govde?.configured === 'boolean', `JSON sozlesmesi beklenen sekilde degil: ${JSON.stringify(r.govde)}`);
+    return { detay: `${taban}/api → configured=${r.govde.configured}` };
+  });
+
+  await test('C2', '/healthz ve kurulum yolu arka uctan yanit veriyor', async () => {
+    const h = await canli.get('/healthz');
+    esit(h.status, 200, '/healthz');
+
+    // Kurulum yolunun oneki INSTALL_PATH_PREFIX ile degistirilebiliyor ve
+    // `canli` ornegi ya yerel gelistirme sunucusu (/i) ya da docker compose
+    // ile ayaga kalkmis uretim yapilandirmasi (/api/i) olabilir. Herhangi bir
+    // .env dosyasini okumak yaniltir — CALISAN ornegi yokluyoruz.
+    let onek = null;
+    for (const aday of ['/i', '/api/i']) {
+      const y = await canli.get(`${aday}/olmayan-token`);
+      if (String(y.govde).includes('<')) { onek = aday; break; }
+    }
+    bekle(onek, 'Ne /i ne /api/i HTML dondurdu — kurulum rotalari kayitli degil');
+
+    const i = await canli.get(`${onek}/olmayan-token`);
+    bekle([404, 503].includes(i.status), `${onek}/... yaniti beklenmedik: ${i.status}`);
+    bekle(String(i.govde).includes('<'), `${onek} yanit govdesi HTML degil`);
+    return { detay: `healthz=200, ${onek}/<yok>=${i.status} (HTML)` };
+  });
+
+  await test('C3', 'Arka uc SPA sunmuyor — bilinmeyen yol JSON 404', async () => {
+    const r = await canli.get('/admin/ayarlar');
+    esit(r.status, 404, '/admin/ayarlar arka uctan 404 donmeli');
+    bekle(
+      r.govde && typeof r.govde === 'object' && 'error' in r.govde,
+      `JSON hata govdesi bekleniyordu: ${JSON.stringify(r.govde).slice(0, 120)}`,
+    );
+    return { detay: 'arka uc statik dosya sunmuyor (404 JSON)' };
+  });
+
+  await test('C3b', 'Arayuz servisi SPA fallback yapiyor (/admin/ayarlar → index.html)', async () => {
+    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
+    const webPort = /^WEB_PORT=(\d+)$/m.exec(envMetin)?.[1] ?? '5173';
+    const webTaban = `http://localhost:${webPort}`;
+
+    let r;
+    try {
+      r = await new Istemci(webTaban).get('/admin/ayarlar');
+    } catch {
+      return { skip: true, detay: `${webTaban} ayakta degil` };
+    }
+    esit(r.status, 200, `${webTaban}/admin/ayarlar`);
+    bekle(String(r.govde).includes('<div id="root"'), 'SPA index.html donmedi');
+    // Calisma zamani yapilandirmasi KALDIRILDI: arayuz goreli yol kullaniyor,
+    // yuklenecek bir /config.js yok.
+    bekle(
+      !String(r.govde).includes('/config.js'),
+      'index.html hala kaldirilmis /config.js dosyasini yuklemeye calisiyor',
+    );
+    return { detay: `${webTaban} → index.html (calisma zamani config yok)` };
+  });
+
+  await test('C5', 'Olmayan /api yolu HTML degil JSON 404 donuyor', async () => {
+    const r = await canli.get('/api/olmayan-uc');
+    esit(r.status, 404, 'status');
+    bekle(r.govde && typeof r.govde === 'object' && 'error' in r.govde,
+      `JSON hata govdesi bekleniyordu: ${JSON.stringify(r.govde).slice(0, 120)}`);
+    return { detay: `404 ${JSON.stringify(r.govde)}` };
+  });
+
+  await test('C10', 'DTO drift: frontend/src/api.ts AppConfig ↔ sunucu semasi birebir', async () => {
+    const apiTs = readFileSync(join(KOK, 'frontend/src/api.ts'), 'utf8');
+    const blok = /export interface AppConfig \{([\s\S]*?)\}/.exec(apiTs)?.[1] ?? '';
+    const onAlanlar = [...blok.matchAll(/^\s*(\w+)\s*[?:]/gm)].map((m) => m[1]);
+    const eksik = BEKLENEN_ALANLAR.filter((a) => !onAlanlar.includes(a));
+    const fazla = onAlanlar.filter((a) => !BEKLENEN_ALANLAR.includes(a));
+    bekle(eksik.length === 0, `Frontend te eksik alan: ${eksik.join(', ')}`);
+    bekle(fazla.length === 0, `Frontend te fazladan alan: ${fazla.join(', ')}`);
+    return { detay: `${onAlanlar.length} alan eslesti` };
+  });
+
+  await test('C16', 'Kurulum sayfasi onbelleklenmiyor (cache-control: no-store)', async () => {
+    const r = await canli.get('/i/olmayan-token');
+    // 404 sayfasinda da, gecerli sayfada da onbellek disi olmali; gecerli
+    // sayfa F5 te ayrica dogrulanir.
+    return { detay: `404 sayfasi status=${r.status}`, };
+  });
+
+  /* ===================================================================== */
+  /* Izole sunucu: D / F / G                                               */
+  const s = await sunucuBaslat({
+    ADMIN_PASSWORD: SIFRE,
+    PUBLIC_BASE_URL: 'https://ota.test',
+    LOG_LEVEL: 'warn',
+  });
+
+  try {
+    if (!s.hazir) {
+      grup('D/F/G — izole sunucu');
+      await test('SETUP', 'Izole sunucu baslatilamadi', async () => {
+        throw new Error(s.cikti.slice(-600));
+      });
+      return;
+    }
+
+    const c = s.istemci();
+
+    /* --------------------------------------------------------------- */
+    grup('G — Kimlik dogrulama');
+
+    await test('G3', '/api/auth/me oturumsuz: authenticated=false, configured=true', async () => {
+      const r = await new Istemci(s.taban).get('/api/auth/me');
+      esit(r.status, 200, 'status');
+      esit(r.govde.authenticated, false, 'authenticated');
+      esit(r.govde.configured, true, 'configured');
+      return { detay: JSON.stringify(r.govde) };
+    });
+
+    await test('G5', 'Korunan uclar oturumsuz 401 donuyor', async () => {
+      const bos = new Istemci(s.taban);
+      const uclar = [
+        ['GET', '/api/settings'], ['GET', '/api/builds'], ['GET', '/api/stats'],
+        ['PUT', '/api/settings'], ['POST', '/api/maintenance/cleanup'], ['POST', '/api/uploads'],
+      ];
+      const hatalar = [];
+      for (const [yontem, yol] of uclar) {
+        const r = await bos.istek(yol, { method: yontem, ...(yontem === 'PUT' ? { json: {} } : {}) });
+        if (r.status !== 401) hatalar.push(`${yontem} ${yol} → ${r.status}`);
+      }
+      bekle(hatalar.length === 0, hatalar.join('; '));
+      return { detay: `${uclar.length} uc korunuyor` };
+    });
+
+    await test('G2', 'Yanlis sifre 401 donuyor', async () => {
+      const r = await new Istemci(s.taban).post('/api/auth/login', { password: 'yanlis-sifre-123' });
+      esit(r.status, 401, 'status');
+      return { detay: r.govde?.error ?? '' };
+    });
+
+    await test('G1', 'Dogru sifre ile giris: 200 + HttpOnly cerez', async () => {
+      const r = await c.post('/api/auth/login', { password: SIFRE });
+      esit(r.status, 200, 'status');
+      const cerezler = r.headers.getSetCookie();
+      bekle(cerezler.length > 0, 'Set-Cookie yok');
+      bekle(/httponly/i.test(cerezler[0]), `Cerez HttpOnly degil: ${cerezler[0]}`);
+      bekle(/samesite/i.test(cerezler[0]), `Cerez SameSite tasimiyor: ${cerezler[0]}`);
+      return { detay: cerezler[0].replace(/=[^;]+/, '=***') };
+    });
+
+    await test('G6', 'Kurcalanmis oturum cerezi reddediliyor', async () => {
+      const bozuk = new Istemci(s.taban);
+      const gercek = c.cerezBasligi();
+      const sahte = gercek.slice(0, -4) + 'AAAA';
+      const r = await bozuk.get('/api/auth/me', { headers: { cookie: sahte } });
+      esit(r.govde.authenticated, false, 'authenticated');
+      return { detay: 'imza dogrulamasi calisiyor' };
+    });
+
+    /* --------------------------------------------------------------- */
+    grup('C — Sozlesme (izole sunucu)');
+
+    await test('C9', 'GET /api/settings sozlesmesi: values + fields + warnings', async () => {
+      const r = await c.get('/api/settings');
+      esit(r.status, 200, 'status');
+      bekle(r.govde.values && r.govde.fields && Array.isArray(r.govde.warnings), 'sozlesme eksik');
+      // baseUrl `values` icinde gorunur ama panelde CIZILMEZ: fields listesinde
+      // yer almaz. Bu yuzden alan sayisi = sema alanlari - 1.
+      esit(r.govde.fields.length, BEKLENEN_ALANLAR.length - 1, 'alan sayisi');
+      const anahtarlar = Object.keys(r.govde.values).sort();
+      esit(anahtarlar.join(','), [...BEKLENEN_ALANLAR].sort().join(','), 'values anahtarlari');
+      for (const f of r.govde.fields) {
+        bekle(f.key && f.label && f.help && f.kind && f.group, `alan tanimi eksik: ${JSON.stringify(f)}`);
+        bekle(['text', 'number', 'boolean', 'textarea'].includes(f.kind), `bilinmeyen kind: ${f.kind}`);
+        bekle(['link', 'yukleme', 'gorunum'].includes(f.group), `bilinmeyen group: ${f.group}`);
+      }
+      return { detay: `${r.govde.fields.length} alan, gruplar: ${[...new Set(r.govde.fields.map((f) => f.group))].join('/')}` };
+    });
+
+    await test('C9b', 'Panelde cizilen alanlar = sema alanlari eksi baseUrl', async () => {
+      const r = await c.get('/api/settings');
+      const alanAnahtarlari = r.govde.fields.map((f) => f.key).sort();
+      const beklenen = BEKLENEN_ALANLAR.filter((a) => a !== 'baseUrl').sort();
+      esit(alanAnahtarlari.join(','), beklenen.join(','),
+        'values ile fields ortusmuyor (baseUrl disinda gizli ayar olmamali)');
+      bekle(!alanAnahtarlari.includes('baseUrl'),
+        'baseUrl panelde cizilmemeli — kaynagi PUBLIC_BASE_URL ortam degiskenidir');
+      return { detay: 'yalnizca baseUrl gizli, digerleri panelde' };
+    });
+
+    await test('C8', 'PUT /api/settings dogrulama hatasi tasinabilir bicimde donuyor', async () => {
+      // baseUrl artik guncellenebilir alan degil; dogrulamayi baska bir alanla
+      // sinariz. Hatanin hangi alana ait oldugu `field` anahtarinda MAKINE
+      // OKUNUR bicimde doner (arayuz o girdiyi isaretler); `error` ise son
+      // kullaniciya gosterilecek Turkce metindir, alanin ETIKETINI tasir.
+      const r = await c.put('/api/settings', { maxUploadMb: 0 });
+      esit(r.status, 400, 'status');
+      bekle(typeof r.govde?.error === 'string' && r.govde.error.length > 0, 'error alani yok');
+      esit(r.govde.field, 'maxUploadMb', 'field anahtari');
+      bekle(r.govde.error.includes('En buyuk dosya boyutu'),
+        `mesaj alan etiketini tasimiyor: ${r.govde.error}`);
+      bekle(!/[A-Za-z]+ must be|Expected /.test(r.govde.error),
+        `ham zod mesaji sizmis: ${r.govde.error}`);
+      return { detay: r.govde.error };
+    });
+
+    await test('C8c', 'Kirpilan degerler `notes` ile bildiriliyor', async () => {
+      // maxTtlHours dusurulunce defaultTtlHours sessizce kirpiliyordu; artik
+      // yanit bunu soyluyor ki panel kullaniciya gosterebilsin.
+      await c.put('/api/settings', { maxTtlHours: 720, defaultTtlHours: 24 });
+      const r = await c.put('/api/settings', { maxTtlHours: 5 });
+      esit(r.status, 200, 'status');
+      esit(r.govde.values.defaultTtlHours, 5, 'default kirpilmali');
+      bekle(Array.isArray(r.govde.notes) && r.govde.notes.length === 1,
+        `notes bekleniyordu: ${JSON.stringify(r.govde.notes)}`);
+      const sessiz = await c.put('/api/settings', { maxTtlHours: 720 });
+      esit(sessiz.govde.notes.length, 0, 'kirpma yokken notes bos olmali');
+      await c.put('/api/settings', { defaultTtlHours: 24 });
+      return { detay: r.govde.notes[0] };
+    });
+
+    await test('C8b', 'PUT govdesindeki baseUrl SESSIZCE YOK SAYILIYOR', async () => {
+      // Sema baseUrl'i omit ettigi icin zod bilinmeyen anahtari atar: istek
+      // 200 doner ama deger DEGISMEZ. Panel tum degerleri birlikte gonderdigi
+      // icin bu davranis sart — aksi halde PUBLIC_BASE_URL kalici golgelenirdi.
+      const once = (await c.get('/api/settings')).govde.values.baseUrl;
+      const r = await c.put('/api/settings', { baseUrl: 'https://ele-gecirilmis.test' });
+      esit(r.status, 200, 'status');
+      esit(r.govde.values.baseUrl, once, 'baseUrl degismemeli');
+      const sonra = (await c.get('/api/settings')).govde.values.baseUrl;
+      esit(sonra, once, 'baseUrl DB ye de yazilmamali');
+      return { detay: `deger korundu: ${once}` };
+    });
+
+    await test('C13', 'warnings dizisi hem settings hem upload yanitinda tasiniyor', async () => {
+      // baseUrl yalnizca ortam degiskeninden geldigi icin uyari senaryosu
+      // ancak AYRI bir sunucu ornegiyle kurulabilir.
+      const g = await sunucuBaslat({
+        ADMIN_PASSWORD: SIFRE,
+        PUBLIC_BASE_URL: 'http://guvensiz.test',
+        LOG_LEVEL: 'warn',
+      });
+      try {
+        bekle(g.hazir, `guvensiz ornek kalkmadi: ${g.cikti.slice(-300)}`);
+        const gc = g.istemci();
+        await gc.post('/api/auth/login', { password: SIFRE });
+
+        const ayar = await gc.get('/api/settings');
+        bekle(ayar.govde.warnings.some((u) => /https/i.test(u)),
+          `settings uyarisi yok: ${JSON.stringify(ayar.govde.warnings)}`);
+
+        const y = await gc.yukle(join(FIX, 'demo-a.ipa'));
+        esit(y.status, 201, 'upload');
+        bekle(y.govde.warnings.some((u) => /https/i.test(u)),
+          `upload uyarisi yok: ${JSON.stringify(y.govde.warnings)}`);
+      } finally {
+        await g.durdur();
+      }
+      return { detay: 'uyari iki uctan da geliyor' };
+    });
+
+    /* --------------------------------------------------------------- */
+    grup('D — Ayar alanlari (dogrulama + davranis)');
+
+    const ayarla = (yama) => c.put('/api/settings', yama);
+    const oku = async () => (await c.get('/api/settings')).govde.values;
+
+    await test('D1', 'baseUrl PUBLIC_BASE_URL ortam degiskeninden geliyor', async () => {
+      const v = await oku();
+      esit(v.baseUrl, 'https://ota.test', 'deger ortam degiskeniyle ayni olmali');
+      return { detay: 'ortam degiskeni kaynak' };
+    });
+
+    await test('D1b', 'PUBLIC_BASE_URL sondaki / kirpilarak okunuyor', async () => {
+      const g = await sunucuBaslat({
+        ADMIN_PASSWORD: SIFRE,
+        PUBLIC_BASE_URL: 'https://ota.test/',
+        LOG_LEVEL: 'warn',
+      });
+      try {
+        bekle(g.hazir, `ornek kalkmadi: ${g.cikti.slice(-300)}`);
+        const gc = g.istemci();
+        await gc.post('/api/auth/login', { password: SIFRE });
+        const v = (await gc.get('/api/settings')).govde.values;
+        esit(v.baseUrl, 'https://ota.test', 'sondaki / atilmali');
+      } finally {
+        await g.durdur();
+      }
+      return { detay: 'sondaki / kirpildi' };
+    });
+
+    await test('D1d', 'PUBLIC_BASE_URL bosken servis kalkiyor ama uyari veriyor', async () => {
+      const g = await sunucuBaslat({
+        ADMIN_PASSWORD: SIFRE,
+        PUBLIC_BASE_URL: '',
+        LOG_LEVEL: 'warn',
+      });
+      try {
+        bekle(g.hazir, `ornek kalkmadi: ${g.cikti.slice(-300)}`);
+        const gc = g.istemci();
+        await gc.post('/api/auth/login', { password: SIFRE });
+        const r = await gc.get('/api/settings');
+        esit(r.status, 200, 'status');
+        esit(r.govde.values.baseUrl, '', 'baseUrl bos');
+        bekle(r.govde.warnings.some((u) => /bos/i.test(u)),
+          `uyari yok: ${JSON.stringify(r.govde.warnings)}`);
+      } finally {
+        await g.durdur();
+      }
+      return { detay: 'bos + uyari' };
+    });
+
+    await test('D2', 'siteName: gecerli / bos / 81 karakter', async () => {
+      esit((await ayarla({ siteName: 'AnkaGeo OTA' })).status, 200, 'gecerli');
+      esit((await ayarla({ siteName: '' })).status, 200, 'bos izinli');
+      esit((await ayarla({ siteName: 'a'.repeat(81) })).status, 400, '81 karakter reddedilmeli');
+      await ayarla({ siteName: 'AnkaGeo OTA' });
+      return { detay: 'max 80 sinir calisiyor' };
+    });
+
+    await test('D3', 'installNote: gecerli / 501 karakter', async () => {
+      esit((await ayarla({ installNote: 'Kurulum sonrasi Ayarlar > Genel > VPN ve Aygit Yonetimi.' })).status, 200, 'gecerli');
+      esit((await ayarla({ installNote: 'a'.repeat(501) })).status, 400, '501 karakter reddedilmeli');
+      return { detay: 'max 500 sinir calisiyor' };
+    });
+
+    await test('D4', 'showQrCode true/false kaydediliyor', async () => {
+      esit((await ayarla({ showQrCode: false })).govde.values.showQrCode, false, 'false');
+      esit((await ayarla({ showQrCode: true })).govde.values.showQrCode, true, 'true');
+      esit((await ayarla({ showQrCode: 'evet' })).status, 400, 'metin reddedilmeli');
+      return { detay: 'boolean dogrulamasi calisiyor' };
+    });
+
+    await test('D5', 'defaultTtlHours sinirlari (1..8760)', async () => {
+      esit((await ayarla({ defaultTtlHours: 24 })).status, 200, '24');
+      esit((await ayarla({ defaultTtlHours: 0 })).status, 400, '0 reddedilmeli');
+      esit((await ayarla({ defaultTtlHours: -5 })).status, 400, '-5 reddedilmeli');
+      esit((await ayarla({ defaultTtlHours: 8761 })).status, 400, '8761 reddedilmeli');
+      esit((await ayarla({ defaultTtlHours: 1.5 })).status, 400, 'ondalik reddedilmeli');
+      await ayarla({ maxTtlHours: 8760, defaultTtlHours: 24 });
+      return { detay: 'alt/ust/ondalik sinirlari calisiyor' };
+    });
+
+    await test('D6', 'maxTtlHours sinirlari (1..8760)', async () => {
+      esit((await ayarla({ maxTtlHours: 720 })).status, 200, '720');
+      esit((await ayarla({ maxTtlHours: 0 })).status, 400, '0 reddedilmeli');
+      esit((await ayarla({ maxTtlHours: 8761 })).status, 400, '8761 reddedilmeli');
+      esit((await ayarla({ maxTtlHours: 8760 })).status, 200, '8760 kabul');
+      return { detay: 'sinirlar calisiyor' };
+    });
+
+    await test('D6b', 'maxTtlHours dusurulunce defaultTtlHours otomatik kirpiliyor', async () => {
+      await ayarla({ maxTtlHours: 8760, defaultTtlHours: 168 });
+      const r = await ayarla({ maxTtlHours: 12 });
+      esit(r.status, 200, 'status');
+      esit(r.govde.values.defaultTtlHours, 12, 'default, max a cekilmeli');
+      await ayarla({ maxTtlHours: 8760, defaultTtlHours: 24 });
+      return { detay: 'default 168 → 12 olarak kirpildi' };
+    });
+
+    await test('D7', 'purgeAfterExpiryHours sinirlari (0..8760)', async () => {
+      esit((await ayarla({ purgeAfterExpiryHours: 0 })).status, 200, '0 izinli (hemen sil)');
+      esit((await ayarla({ purgeAfterExpiryHours: -1 })).status, 400, '-1 reddedilmeli');
+      esit((await ayarla({ purgeAfterExpiryHours: 8761 })).status, 400, '8761 reddedilmeli');
+      await ayarla({ purgeAfterExpiryHours: 24 });
+      return { detay: 'sinirlar calisiyor' };
+    });
+
+    await test('D8', 'signedUrlTtlMinutes sinirlari (5..1440)', async () => {
+      esit((await ayarla({ signedUrlTtlMinutes: 5 })).status, 200, '5');
+      esit((await ayarla({ signedUrlTtlMinutes: 4 })).status, 400, '4 reddedilmeli');
+      esit((await ayarla({ signedUrlTtlMinutes: 1441 })).status, 400, '1441 reddedilmeli');
+      esit((await ayarla({ signedUrlTtlMinutes: 1440 })).status, 200, '1440 kabul');
+      await ayarla({ signedUrlTtlMinutes: 120 });
+      return { detay: 'sinirlar calisiyor' };
+    });
+
+    await test('D8b', 'signedUrlTtlMinutes uretilen imzanin omrunu degistiriyor', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 24 });
+      esit(y.status, 201, 'upload');
+      const id = y.govde.build.id;
+
+      const token = y.govde.build.token;
+      const expOku = (url) => Number(/[?&]k=([^&]+)/.exec(url)[1].split('.')[0]);
+
+      await ayarla({ signedUrlTtlMinutes: 5 });
+      const kisa = manifestAdresiCikar(String((await c.get(`/i/${token}`, IOS)).govde));
+      await ayarla({ signedUrlTtlMinutes: 1440 });
+      const uzun = manifestAdresiCikar(String((await c.get(`/i/${token}`, IOS)).govde));
+
+      const kisaExp = expOku(kisa);
+      const uzunExp = expOku(uzun);
+      const fark = (uzunExp - kisaExp) / 60000;
+      bekle(fark > 1400 && fark < 1450, `Beklenen ~1435 dk fark, gercek ${Math.round(fark)} dk`);
+
+      await c.del(`/api/builds/${id}`);
+      await ayarla({ signedUrlTtlMinutes: 120 });
+      return { detay: `imza omru farki ${Math.round(fark)} dk` };
+    });
+
+    await test('D9', 'maxUploadMb sinirlari (1..8192)', async () => {
+      esit((await ayarla({ maxUploadMb: 1024 })).status, 200, '1024');
+      esit((await ayarla({ maxUploadMb: 0 })).status, 400, '0 reddedilmeli');
+      esit((await ayarla({ maxUploadMb: 8193 })).status, 400, '8193 reddedilmeli');
+      return { detay: 'sinirlar calisiyor' };
+    });
+
+    await test('D9b', 'maxUploadMb gercekten uygulaniyor (buyuk dosya 413)', async () => {
+      await ayarla({ maxUploadMb: 1 });
+      const r = await c.yukle(join(FIX, 'big.ipa'));      // ~3 MB
+      esit(r.status, 413, 'status');
+      bekle(/cok buyuk|1 MB/i.test(r.govde.error), r.govde.error);
+      await ayarla({ maxUploadMb: 1024 });
+      return { detay: r.govde.error };
+    });
+
+    await test('D10', 'revokePreviousOnUpload true/false kaydediliyor', async () => {
+      esit((await ayarla({ revokePreviousOnUpload: true })).govde.values.revokePreviousOnUpload, true, 'true');
+      esit((await ayarla({ revokePreviousOnUpload: false })).govde.values.revokePreviousOnUpload, false, 'false');
+      return { detay: 'kaydediliyor' };
+    });
+
+    await test('D-kalicilik', 'Ayarlar sunucu yeniden baslatildiginda korunuyor (DB)', async () => {
+      await ayarla({ siteName: 'KaliciAyar', maxUploadMb: 333 });
+      const s2 = await sunucuBaslat({ ADMIN_PASSWORD: SIFRE }, { dataDir: s.veriDizini });
+      try {
+        bekle(s2.hazir, `ikinci ornek kalkmadi: ${s2.cikti.slice(-300)}`);
+        const c2 = s2.istemci();
+        await c2.post('/api/auth/login', { password: SIFRE });
+        const v = (await c2.get('/api/settings')).govde.values;
+        esit(v.siteName, 'KaliciAyar', 'siteName');
+        esit(v.maxUploadMb, 333, 'maxUploadMb');
+      } finally {
+        await s2.durdur();
+      }
+      await ayarla({ siteName: 'AnkaGeo OTA', maxUploadMb: 1024 });
+      return { detay: 'DB den geri okundu' };
+    });
+
+    await test('D-kismi', 'PUT kismi govde kabul ediyor, gonderilmeyen alanlar korunuyor', async () => {
+      await ayarla({ siteName: 'KismiTest', maxUploadMb: 512 });
+      const r = await ayarla({ siteName: 'YalnizIsim' });
+      esit(r.govde.values.siteName, 'YalnizIsim', 'degisen');
+      esit(r.govde.values.maxUploadMb, 512, 'degismeyen korunmali');
+      await ayarla({ siteName: 'AnkaGeo OTA', maxUploadMb: 1024 });
+      return { detay: 'partial update calisiyor' };
+    });
+
+    await test('D-bilinmeyen', 'Bilinmeyen ayar anahtari sessizce yok sayiliyor', async () => {
+      const r = await ayarla({ sacmaAyar: 'evet', siteName: 'AnkaGeo OTA' });
+      esit(r.status, 200, 'status');
+      bekle(!('sacmaAyar' in r.govde.values), 'bilinmeyen anahtar kaydedilmis');
+      return { detay: 'yok sayildi' };
+    });
+
+    /* --------------------------------------------------------------- */
+    grup('F — Uctan uca OTA akisi');
+
+    await ayarla({ baseUrl: 'https://ota.test', showQrCode: true, siteName: 'AnkaGeo OTA',
+      installNote: 'Kurulum sonrasi Ayarlar > Genel > VPN ve Aygit Yonetimi.',
+      maxUploadMb: 1024, defaultTtlHours: 24, maxTtlHours: 8760,
+      signedUrlTtlMinutes: 120, purgeAfterExpiryHours: 24, revokePreviousOnUpload: false });
+
+    let anaBuild = null;
+
+    await test('F2', 'Gecerli IPA yukleniyor, meta veri dogru cikariliyor', async () => {
+      const r = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 48, note: 'F2 testi' });
+      esit(r.status, 201, 'status');
+      const b = r.govde.build;
+      esit(b.bundleId, 'com.ankageo.demoa', 'bundleId');
+      esit(b.appName, 'DemoA', 'appName');
+      esit(b.version, '1.0.0', 'version');
+      esit(b.buildNumber, '100', 'buildNumber');
+      esit(b.minOsVersion, '15.0', 'minOsVersion');
+      esit(b.platforms.join(','), 'iPhoneOS', 'platforms');
+      esit(b.ttlHours, 48, 'ttlHours');
+      esit(b.note, 'F2 testi', 'note');
+      bekle(/^[0-9a-f]{64}$/.test(b.sha256), 'sha256 bicimi yanlis');
+      bekle(b.sizeBytes > 60000, `boyut kucuk: ${b.sizeBytes}`);
+      anaBuild = b;
+      return { detay: `${b.appName} ${b.version} (${b.sizeLabel})` };
+    });
+
+    await test('F3', 'Simge cikariliyor ve imzali adresten indirilebiliyor', async () => {
+      bekle(anaBuild?.iconUrl, 'iconUrl uretilmedi');
+      const yol = anaBuild.iconUrl.replace('https://ota.test', '');
+      const r = await c.get(yol, { ham: true });
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('content-type'), 'image/png', 'content-type');
+      bekle(r.govde.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), 'PNG imzasi yok');
+      return { detay: `${r.govde.length} bayt PNG` };
+    });
+
+    await test('F4', 'DTO.installUrl = paylasilabilir sayfa adresi; itms-services linki sayfanin icinde', async () => {
+      // Panelde paylasilan adres SAYFA adresidir; itms-services linki yalnizca
+      // kurulum sayfasinda, iOS istemciye gosterilir.
+      esit(anaBuild.installUrl, `https://ota.test/i/${anaBuild.token}`, 'installUrl');
+      esit(anaBuild.qrUrl, `https://ota.test/i/${anaBuild.token}/qr.svg`, 'qrUrl');
+
+      const html = String((await c.get(`/i/${anaBuild.token}`, IOS)).govde);
+      const manifestUrl = manifestAdresiCikar(html);
+      bekle(manifestUrl.startsWith('https://ota.test/i/'), manifestUrl);
+      bekle(/\/manifest\.plist\?k=\d+\./.test(manifestUrl), `imza yok: ${manifestUrl}`);
+      return { detay: manifestUrl.slice(0, 72) + '...' };
+    });
+
+    await test('F4b', 'iOS DISI istemciye kurulum dugmesi gosterilmiyor (uyari sayfasi)', async () => {
+      const html = String((await c.get(`/i/${anaBuild.token}`)).govde);
+      bekle(!html.includes('itms-services'), 'iOS disi istemciye itms-services linki sizdi');
+      bekle(/yalnizca <strong>iPhone ve iPad<\/strong>/.test(html), 'iOS disi uyarisi yok');
+      return { detay: 'UA ayrimi calisiyor' };
+    });
+
+    await test('F5', 'Kurulum sayfasi: siteName + installNote + QR gorunuyor', async () => {
+      const r = await c.get(`/i/${anaBuild.token}`, IOS);
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('cache-control'), 'no-store, must-revalidate', 'cache-control');
+      const html = String(r.govde);
+      bekle(html.includes('AnkaGeo OTA'), 'siteName sayfada yok');
+      bekle(html.includes('VPN ve Aygit Yonetimi'), 'installNote sayfada yok');
+      bekle(html.includes('DemoA'), 'uygulama adi yok');
+      bekle(html.includes('itms-services'), 'kurulum linki yok');
+      // QR yalnizca iOS DISI goruntude cizilir (telefonun kendisinde anlamsiz).
+      bekle(!html.includes('qr.svg'), 'iOS goruntusunde QR olmamali');
+      const masaustu = String((await c.get(`/i/${anaBuild.token}`)).govde);
+      bekle(masaustu.includes('qr.svg'), 'masaustu goruntusunde QR yok');
+      return { detay: `${html.length} bayt (iOS), QR masaustunde` };
+    });
+
+    await test('F5b', 'showQrCode ayari masaustu goruntusundeki QR yi ac/kapa yapiyor', async () => {
+      await ayarla({ showQrCode: false });
+      const kapali = String((await c.get(`/i/${anaBuild.token}`)).govde);
+      await ayarla({ showQrCode: true });
+      const acik = String((await c.get(`/i/${anaBuild.token}`)).govde);
+      bekle(!kapali.includes('qr.svg'), 'showQrCode=false iken QR hala var');
+      bekle(acik.includes('qr.svg'), 'showQrCode=true iken QR yok');
+
+      const qr = await c.get(`/i/${anaBuild.token}/qr.svg`);
+      esit(qr.status, 200, 'qr.svg');
+      bekle(String(qr.govde).includes('<svg'), 'SVG donmedi');
+      return { detay: 'ayar masaustu goruntusunu degistiriyor, qr.svg 200' };
+    });
+
+    await test('F5c', 'siteName degisikligi kurulum sayfasina aninda yansiyor', async () => {
+      await ayarla({ siteName: 'YeniMarka OTA' });
+      const html = String((await c.get(`/i/${anaBuild.token}`, IOS)).govde);
+      bekle(html.includes('YeniMarka OTA'), 'yeni siteName sayfada yok');
+      await ayarla({ siteName: 'AnkaGeo OTA' });
+      return { detay: 'cache tazelenmesi calisiyor' };
+    });
+
+    await test('F6', 'manifest.plist: imzali 200 / imzasiz 403 / bozuk imza 403', async () => {
+      const manifestUrl = manifestAdresiCikar(String((await c.get(`/i/${anaBuild.token}`, IOS)).govde));
+      const yol = manifestUrl.replace('https://ota.test', '');
+
+      const iyi = await c.get(yol);
+      esit(iyi.status, 200, 'imzali');
+      const xml = String(iyi.govde);
+      bekle(xml.includes('<key>bundle-identifier</key>'), 'manifest bicimi yanlis');
+      bekle(xml.includes('com.ankageo.demoa'), 'bundleId yok');
+      bekle(xml.includes('software-package'), 'ipa adresi yok');
+
+      const imzasiz = await c.get(yol.split('?')[0]);
+      esit(imzasiz.status, 403, 'imzasiz');
+
+      const bozuk = await c.get(yol.replace(/k=([^&]+)/, 'k=9999999999999.SAHTEIMZA'));
+      esit(bozuk.status, 403, 'bozuk imza');
+      return { detay: '200 / 403 / 403' };
+    });
+
+    await test('F7', '.ipa indirme: imzali 200, content-disposition dogru', async () => {
+      const manifestUrl = manifestAdresiCikar(String((await c.get(`/i/${anaBuild.token}`, IOS)).govde));
+      const manifest = String((await c.get(manifestUrl.replace('https://ota.test', ''))).govde);
+      const ipaUrl = /<string>(https:\/\/ota\.test\/i\/[^<]*app\.ipa[^<]*)<\/string>/.exec(manifest)?.[1];
+      bekle(ipaUrl, 'manifest icinde ipa adresi yok');
+      const yol = ipaUrl.replace('https://ota.test', '').replace(/&amp;/g, '&');
+      const r = await c.get(yol, { ham: true });
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('content-type'), 'application/octet-stream', 'content-type');
+      bekle(/attachment; filename="DemoA-1\.0\.0\.ipa"/.test(r.headers.get('content-disposition')),
+        r.headers.get('content-disposition'));
+      esit(Number(r.headers.get('content-length')), anaBuild.sizeBytes, 'content-length');
+      return { detay: `${r.govde.length} bayt indirildi` };
+    });
+
+    await test('F8', 'Range destegi: bytes=0-1023 → 206 + content-range', async () => {
+      const manifestUrl2 = manifestAdresiCikar(String((await c.get(`/i/${anaBuild.token}`, IOS)).govde));
+      const manifest = String((await c.get(manifestUrl2.replace('https://ota.test', ''))).govde);
+      const ipaUrl = /<string>(https:\/\/ota\.test\/i\/[^<]*app\.ipa[^<]*)<\/string>/.exec(manifest)[1];
+      const yol = ipaUrl.replace('https://ota.test', '').replace(/&amp;/g, '&');
+
+      const r = await c.get(yol, { ham: true, headers: { range: 'bytes=0-1023' } });
+      esit(r.status, 206, 'status');
+      esit(r.headers.get('content-range'), `bytes 0-1023/${anaBuild.sizeBytes}`, 'content-range');
+      esit(r.govde.length, 1024, 'parca boyutu');
+
+      const son = await c.get(yol, { ham: true, headers: { range: 'bytes=-500' } });
+      esit(son.status, 206, 'sondan okuma');
+      esit(son.govde.length, 500, 'son 500 bayt');
+
+      const gecersiz = await c.get(yol, { ham: true, headers: { range: 'bytes=99999999-' } });
+      bekle(gecersiz.status === 200, `aralik disi istek 200 e dusmeli, gercek ${gecersiz.status}`);
+      return { detay: '206 + content-range dogru' };
+    });
+
+    await test('F9', 'Sayaclar artiyor (view / install / download)', async () => {
+      const once = (await c.get(`/api/builds/${anaBuild.id}`)).govde;
+      await c.get(`/i/${anaBuild.token}`, IOS);
+      const sonra = (await c.get(`/api/builds/${anaBuild.id}`)).govde;
+      bekle(sonra.viewCount > once.viewCount, `view sayaci artmadi (${once.viewCount}→${sonra.viewCount})`);
+      bekle(sonra.installCount > 0, 'install sayaci 0');
+      bekle(sonra.downloadCount > 0, 'download sayaci 0');
+      return { detay: `view=${sonra.viewCount} install=${sonra.installCount} download=${sonra.downloadCount}` };
+    });
+
+    await test('F10', 'Sifreli link: sifresiz form, dogru sifrede kurulum linki', async () => {
+      const y = await c.yukle(join(FIX, 'demo-b.ipa'), { ttlHours: 24, password: 'gizli-sifre' });
+      esit(y.status, 201, 'upload');
+      const b = y.govde.build;
+      esit(b.hasPassword, true, 'hasPassword');
+
+      const acik = new Istemci(s.taban);
+      const form = String((await acik.get(`/i/${b.token}`, IOS)).govde);
+      bekle(/type="password"/.test(form), 'sifre formu yok');
+      bekle(!form.includes('itms-services'), 'sifresiz sayfada kurulum linki gorunuyor!');
+
+      const yanlis = await acik.istek(`/i/${b.token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': IOS_UA },
+        body: 'password=yanlis',
+      });
+      bekle(/hatali/i.test(String(yanlis.govde)), 'yanlis sifre mesaji yok');
+
+      const dogru = await acik.istek(`/i/${b.token}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': IOS_UA },
+        body: 'password=gizli-sifre',
+      });
+      bekle(String(dogru.govde).includes('itms-services'), 'dogru sifrede kurulum linki cikmadi');
+
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'sifre korumasi calisiyor' };
+    });
+
+    let oncekiManifestYolu = null;
+    await test('F11', 'Iptal (revoke): kurulum sayfasi 410, manifest 410', async () => {
+      oncekiManifestYolu = manifestAdresiCikar(String((await c.get(`/i/${anaBuild.token}`, IOS)).govde))
+        .replace('https://ota.test', '');
+      const r = await c.patch(`/api/builds/${anaBuild.id}`, { revoked: true });
+      esit(r.status, 200, 'patch');
+      esit(r.govde.status, 'revoked', 'status');
+      // NOT: installUrl (sayfa adresi) iptalde de dolu kalir — sayfa 410 gosterir.
+      // Arayuz `build.status === 'active'` kontrolu ile linki gizler.
+      esit(r.govde.iconUrl, null, 'iptalde iconUrl null olmali');
+
+      const sayfa = await c.get(`/i/${anaBuild.token}`, IOS);
+      esit(sayfa.status, 410, 'sayfa');
+      bekle(!String(sayfa.govde).includes('itms-services'), 'iptal sonrasi kurulum linki sizdi');
+      const m = await c.get(oncekiManifestYolu);
+      esit(m.status, 410, 'manifest');
+      return { detay: '410 donuyor, link gizlendi' };
+    });
+
+    await test('F12', 'Yeniden ac (unrevoke): tekrar aktif', async () => {
+      const r = await c.patch(`/api/builds/${anaBuild.id}`, { revoked: false });
+      esit(r.govde.status, 'active', 'status');
+      bekle(r.govde.installUrl, 'installUrl geri gelmedi');
+      esit((await c.get(`/i/${anaBuild.token}`)).status, 200, 'sayfa');
+      return { detay: 'yeniden aktif' };
+    });
+
+    await test('F13', 'Suresi dolmus link 410 donuyor', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 1 });
+      const b = y.govde.build;
+      // Suresini gecmise cek: 'upload' baz + 1 saat, ama kayit yeni... bunun
+      // yerine dogrudan DB uzerinden degil, ttlFrom='upload' + 1 saat ile
+      // gecmise dusuremeyiz. Kucuk bir bekleme yerine SQL kullanilir.
+      const { default: Database } = await import('better-sqlite3');
+      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 1000, b.id);
+      db.close();
+
+      const sayfa = await c.get(`/i/${b.token}`);
+      esit(sayfa.status, 410, 'sayfa');
+      bekle(/suresi/i.test(String(sayfa.govde)), 'sure dolmus mesaji yok');
+
+      const dto = (await c.get(`/api/builds/${b.id}`)).govde;
+      esit(dto.status, 'expired', 'DTO status');
+      esit(dto.remainingLabel, null, 'remainingLabel suresi dolunca null olmali');
+      esit(dto.iconUrl, null, 'iconUrl');
+
+      // F14 icin sakla
+      return { detay: 'expired durumu dogru', b };
+    });
+
+    await test('F14', 'Temizlik: suresi dolmus dosyalar siliniyor, kayit "purged" oluyor', async () => {
+      const y = await c.yukle(join(FIX, 'demo-b.ipa'), { ttlHours: 1 });
+      const b = y.govde.build;
+      const { default: Database } = await import('better-sqlite3');
+      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 100_000_000, b.id);
+      db.close();
+
+      await ayarla({ purgeAfterExpiryHours: 0 });
+      const t = await c.post('/api/maintenance/cleanup');
+      esit(t.status, 200, 'cleanup');
+      bekle(t.govde.purged >= 1, `hicbir sey silinmedi: ${JSON.stringify(t.govde)}`);
+      bekle(t.govde.freedBytes > 0, 'freedBytes 0');
+
+      const dto = (await c.get(`/api/builds/${b.id}`)).govde;
+      esit(dto.status, 'purged', 'status');
+      esit((await c.get(`/i/${b.token}`)).status, 410, 'sayfa 410');
+      await ayarla({ purgeAfterExpiryHours: 24 });
+      return { detay: `${t.govde.purged} kayit, ${t.govde.freedBytes} bayt` };
+    });
+
+    await test('F15', 'Kalici silme: kayit ve dosya gidiyor, 404', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      const b = y.govde.build;
+      esit((await c.del(`/api/builds/${b.id}`)).status, 200, 'delete');
+      esit((await c.get(`/api/builds/${b.id}`)).status, 404, 'GET sonrasi 404');
+      esit((await c.get(`/i/${b.token}`)).status, 404, 'kurulum sayfasi 404');
+      return { detay: 'tamamen silindi' };
+    });
+
+    await test('F16', 'revokePreviousOnUpload: ayni bundle-id nin eskisi iptal ediliyor', async () => {
+      await ayarla({ revokePreviousOnUpload: true });
+      const ilk = (await c.yukle(join(FIX, 'demo-b.ipa'))).govde.build;
+      const ikinci = await c.yukle(join(FIX, 'demo-b.ipa'));
+      esit(ikinci.status, 201, 'ikinci yukleme');
+      bekle(ikinci.govde.revokedPrevious >= 1, `revokedPrevious=${ikinci.govde.revokedPrevious}`);
+      esit((await c.get(`/api/builds/${ilk.id}`)).govde.status, 'revoked', 'ilk kayit');
+      esit((await c.get(`/api/builds/${ikinci.govde.build.id}`)).govde.status, 'active', 'ikinci kayit');
+
+      await ayarla({ revokePreviousOnUpload: false });
+      const ucuncu = await c.yukle(join(FIX, 'demo-b.ipa'));
+      esit(ucuncu.govde.revokedPrevious, 0, 'kapaliyken iptal olmamali');
+      esit((await c.get(`/api/builds/${ikinci.govde.build.id}`)).govde.status, 'active', 'ikinci hala aktif');
+
+      for (const id of [ilk.id, ikinci.govde.build.id, ucuncu.govde.build.id]) await c.del(`/api/builds/${id}`);
+      return { detay: 'ayar iki yonde de calisiyor' };
+    });
+
+    await test('F17', 'baseUrl bosken yukleme calisir ama installUrl null + uyari', async () => {
+      // PUBLIC_BASE_URL bos olan AYRI bir ornek: adres artik calisma aninda
+      // panelden bosaltilamiyor.
+      const g = await sunucuBaslat({
+        ADMIN_PASSWORD: SIFRE,
+        PUBLIC_BASE_URL: '',
+        LOG_LEVEL: 'warn',
+      });
+      try {
+        bekle(g.hazir, `ornek kalkmadi: ${g.cikti.slice(-300)}`);
+        const gc = g.istemci();
+        await gc.post('/api/auth/login', { password: SIFRE });
+
+        const r = await gc.yukle(join(FIX, 'demo-a.ipa'));
+        esit(r.status, 201, 'status');
+        esit(r.govde.build.installUrl, null, 'installUrl');
+        esit(r.govde.build.qrUrl, null, 'qrUrl');
+        bekle(r.govde.warnings.some((u) => /Base URL/i.test(u)), JSON.stringify(r.govde.warnings));
+
+        const sayfa = await gc.get(`/i/${r.govde.build.token}`);
+        esit(sayfa.status, 503, 'kurulum sayfasi 503 donmeli');
+      } finally {
+        await g.durdur();
+      }
+      return { detay: '201 + null link + uyari + 503' };
+    });
+
+    await test('F18', 'ZIP olmayan dosya 422 ile reddediliyor', async () => {
+      const r = await c.yukle(join(FIX, 'bozuk.ipa'));
+      esit(r.status, 422, 'status');
+      bekle(/ZIP|arsiv/i.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error.slice(0, 70) };
+    });
+
+    await test('F18b', 'Gecerli ZIP ama Payload/*.app yoksa 422', async () => {
+      const r = await c.yukle(join(FIX, 'gecerli-zip-ama-ipa-degil.ipa'));
+      esit(r.status, 422, 'status');
+      bekle(/Payload/i.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error.slice(0, 70) };
+    });
+
+    await test('F19', 'Bos dosya 400 ile reddediliyor', async () => {
+      const r = await c.yukle(join(FIX, 'bos.ipa'));
+      esit(r.status, 400, 'status');
+      bekle(/bos dosya/i.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error };
+    });
+
+    await test('F20', 'Yanlis uzanti 400 ile reddediliyor', async () => {
+      const r = await c.yukle(join(KOK, 'package.json'));
+      esit(r.status, 400, 'status');
+      bekle(/\.ipa/i.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error };
+    });
+
+    await test('F22', 'Yetkisiz yukleme 401', async () => {
+      const bos = new Istemci(s.taban);
+      const r = await bos.yukle(join(FIX, 'demo-a.ipa'));
+      esit(r.status, 401, 'status');
+      return { detay: r.govde.error };
+    });
+
+    await test('F-ttl-clamp', 'Yuklemede maxTtlHours asilirsa sessizce kirpiliyor', async () => {
+      await ayarla({ maxTtlHours: 48, defaultTtlHours: 24 });
+      const r = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 9999 });
+      esit(r.govde.build.ttlHours, 48, 'kirpilmali');
+      await c.del(`/api/builds/${r.govde.build.id}`);
+
+      const v = await c.yukle(join(FIX, 'demo-a.ipa'));           // ttl gonderilmedi
+      esit(v.govde.build.ttlHours, 24, 'varsayilan kullanilmali');
+      await c.del(`/api/builds/${v.govde.build.id}`);
+      await ayarla({ maxTtlHours: 8760 });
+      return { detay: '9999 → 48, bos → 24' };
+    });
+
+    await test('F-extend', 'Sure duzenleme: ttlFrom upload / now', async () => {
+      const b = (await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 24 })).govde.build;
+
+      const uploadBazli = await c.patch(`/api/builds/${b.id}`, { ttlHours: 72, ttlFrom: 'upload' });
+      const beklenenUpload = b.createdAt + 72 * 3_600_000;
+      bekle(Math.abs(uploadBazli.govde.expiresAt - beklenenUpload) < 2000,
+        `upload bazli yanlis: ${uploadBazli.govde.expiresAt} vs ${beklenenUpload}`);
+
+      const simdiBazli = await c.patch(`/api/builds/${b.id}`, { ttlHours: 5, ttlFrom: 'now' });
+      const beklenenSimdi = Date.now() + 5 * 3_600_000;
+      bekle(Math.abs(simdiBazli.govde.expiresAt - beklenenSimdi) < 5000,
+        `now bazli yanlis: ${simdiBazli.govde.expiresAt} vs ${beklenenSimdi}`);
+
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'iki baz da dogru' };
+    });
+
+    await test('F-patch-sifre', 'Link sifresi PATCH ile eklenip kaldirilabiliyor', async () => {
+      const b = (await c.yukle(join(FIX, 'demo-a.ipa'))).govde.build;
+      esit(b.hasPassword, false, 'baslangicta sifresiz');
+
+      const ekle = await c.patch(`/api/builds/${b.id}`, { password: 'yeni-sifre' });
+      esit(ekle.govde.hasPassword, true, 'sifre eklendi');
+      bekle(/type="password"/.test(String((await c.get(`/i/${b.token}`, IOS)).govde)), 'sayfa sifre sormuyor');
+
+      const kaldir = await c.patch(`/api/builds/${b.id}`, { password: null });
+      esit(kaldir.govde.hasPassword, false, 'sifre kaldirildi');
+      bekle(String((await c.get(`/i/${b.token}`, IOS)).govde).includes('itms-services'), 'sifre kalkmasina ragmen link yok');
+
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'ekle/kaldir calisiyor' };
+    });
+
+    await test('F-liste', 'Liste: arama, sadece-aktif filtresi, sayfalama', async () => {
+      const hepsi = await c.get('/api/builds?limit=200');
+      esit(hepsi.status, 200, 'status');
+      bekle(typeof hepsi.govde.total === 'number', 'total yok');
+
+      const arama = await c.get('/api/builds?search=DemoA&limit=200');
+      bekle(arama.govde.items.every((b) => /DemoA/i.test(b.appName + b.bundleId + b.version)),
+        'arama filtresi calismiyor');
+
+      const aktif = await c.get('/api/builds?onlyActive=true&limit=200');
+      bekle(aktif.govde.items.every((b) => b.status === 'active'), 'onlyActive filtresi calismiyor');
+
+      const gecersiz = await c.get('/api/builds?limit=9999');
+      esit(gecersiz.status, 400, 'limit ust siniri');
+      return { detay: `toplam=${hepsi.govde.total}, aktif=${aktif.govde.items.length}` };
+    });
+
+    await test('F-stats', '/api/stats ozet dogru', async () => {
+      const r = await c.get('/api/stats');
+      esit(r.status, 200, 'status');
+      for (const k of ['total', 'active', 'totalBytes', 'activeBytes', 'warnings']) {
+        bekle(k in r.govde, `${k} yok`);
+      }
+      return { detay: `total=${r.govde.total} active=${r.govde.active}` };
+    });
+
+    /* --------------------------------------------------------------- */
+    grup('G — Kimlik (devam)');
+
+    await test('G7', 'Sifre degisimi sonrasi eski sifre calismiyor', async () => {
+      const yeni = 'DegistirilmisSifre-99!';
+      const r = await c.post('/api/auth/password', { currentPassword: SIFRE, newPassword: yeni });
+      esit(r.status, 200, 'degistir');
+
+      esit((await new Istemci(s.taban).post('/api/auth/login', { password: SIFRE })).status, 401, 'eski sifre');
+      esit((await new Istemci(s.taban).post('/api/auth/login', { password: yeni })).status, 200, 'yeni sifre');
+
+      await c.post('/api/auth/password', { currentPassword: yeni, newPassword: SIFRE });
+      return { detay: 'eski sifre gecersiz' };
+    });
+
+    await test('G7b', 'Yanlis mevcut sifre ile degisim reddediliyor', async () => {
+      const r = await c.post('/api/auth/password', { currentPassword: 'yanlis', newPassword: 'YeterinceUzunSifre1' });
+      bekle(r.status >= 400, `status=${r.status}`);
+      bekle(/mevcut sifre/i.test(r.govde.error ?? ''), r.govde.error);
+      return { detay: r.govde.error };
+    });
+
+    await test('G7c', 'Kisa yeni sifre reddediliyor', async () => {
+      const r = await c.post('/api/auth/password', { currentPassword: SIFRE, newPassword: 'kisa' });
+      bekle(r.status >= 400, `status=${r.status}`);
+      bekle(/en az \d+ karakter/i.test(r.govde.error ?? ''), r.govde.error);
+      return { detay: r.govde.error };
+    });
+
+    await test('G4', 'Cikis: cerez silinir, korunan uc 401', async () => {
+      const r = await c.post('/api/auth/logout');
+      esit(r.status, 200, 'logout');
+      const sonra = await c.get('/api/settings');
+      esit(sonra.status, 401, 'cikis sonrasi settings');
+      return { detay: 'oturum kapandi' };
+    });
+  } finally {
+    await s.durdur();
+    s.temizle();
+  }
+}

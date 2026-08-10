@@ -1,0 +1,386 @@
+/* ---------------------------------------------------------------------------
+   Tasarim degiskenleri. Acik/koyu tema isletim sistemi tercihini izler.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --fg: #1c1c1e;
+  --fg-muted: #6b6b70;
+  --border: #e2e2e7;
+  --accent: #0a66ff;
+  --accent-fg: #ffffff;
+  --accent-soft: #e8f0ff;
+  --ok: #0a7d3f;
+  --ok-soft: #e3f5ea;
+  --warn: #92400e;
+  --warn-soft: #fff3e0;
+  --err: #b3261e;
+  --err-soft: #ffeceb;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 6px 20px rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181b;
+    --surface-2: #202024;
+    --fg: #f4f4f5;
+    --fg-muted: #9b9ba3;
+    --border: #2a2a30;
+    --accent: #4d8dff;
+    --accent-fg: #08132a;
+    --accent-soft: #16233d;
+    --ok: #4ade80;
+    --ok-soft: #102a1a;
+    --warn: #fbbf5b;
+    --warn-soft: #2f2411;
+    --err: #ff8f86;
+    --err-soft: #2f1614;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; letter-spacing: -0.02em; font-weight: 650; }
+h1 { font-size: 26px; }
+h2 { font-size: 19px; }
+h3 { font-size: 16px; }
+p { margin: 0; }
+a { color: var(--accent); }
+
+/* --- Duzen ---------------------------------------------------------------- */
+
+.app { min-height: 100%; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 20px;
+  padding: 0 22px; height: 58px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 650; letter-spacing: -0.02em; }
+.brand svg { display: block; }
+.nav { display: flex; gap: 3px; margin-left: auto; align-items: center; }
+.nav a {
+  padding: 7px 13px; border-radius: 9px; text-decoration: none;
+  color: var(--fg-muted); font-weight: 520; font-size: 14px;
+}
+.nav a:hover { background: var(--surface-2); color: var(--fg); }
+.nav a.active { background: var(--accent-soft); color: var(--accent); }
+
+.main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 30px 22px 80px; }
+.main.narrow { max-width: 680px; }
+
+.page-head { margin-bottom: 24px; }
+.page-head p { color: var(--fg-muted); margin-top: 5px; }
+
+/* --- Kartlar -------------------------------------------------------------- */
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 18px; }
+.card-body { padding: 20px 22px; }
+.card-head {
+  padding: 16px 22px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+.card-head h2 { font-size: 16px; }
+.card-head .sub { color: var(--fg-muted); font-size: 13px; margin-left: auto; }
+
+/* --- Butonlar ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 17px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  background: var(--accent); color: var(--accent-fg);
+  font: inherit; font-weight: 560; font-size: 14px; cursor: pointer;
+  text-decoration: none; white-space: nowrap;
+  transition: opacity .12s ease, background .12s ease;
+}
+.btn:hover:not(:disabled) { opacity: .88; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.secondary { background: var(--surface-2); color: var(--fg); border-color: var(--border); }
+.btn.ghost { background: transparent; color: var(--fg-muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--fg); }
+.btn.danger { background: transparent; color: var(--err); border-color: var(--border); }
+.btn.danger:hover:not(:disabled) { background: var(--err-soft); }
+.btn.sm { padding: 6px 11px; font-size: 13px; }
+.btn.block { width: 100%; }
+.btn.lg { padding: 13px 24px; font-size: 16px; }
+
+/* --- Form ----------------------------------------------------------------- */
+
+.field { margin-bottom: 17px; }
+.field:last-child { margin-bottom: 0; }
+/* `.field-label`: girdisi olmayan (salt okunur) alanlar icin ayni gorunum.
+   Bos bir <label> yazmak yerine bunu kullanin — hicbir kontrole bagli olmayan
+   etiket ekran okuyucuda karsiliksiz kalir. */
+.field label, .field .field-label { display: block; font-weight: 560; font-size: 14px; margin-bottom: 5px; }
+.field .help { color: var(--fg-muted); font-size: 13px; margin-bottom: 7px; line-height: 1.45; }
+.input, .textarea, .select {
+  width: 100%; padding: 10px 13px; font: inherit; font-size: 14px;
+  background: var(--surface-2); color: var(--fg);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.input:focus, .textarea:focus, .select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.textarea { min-height: 78px; resize: vertical; }
+
+/* Kaynagi ortam degiskeni olan ayarlar — girdi gibi hizalanir ama duzenlenemez.
+   Girdiden ayirt edilebilsin diye zemini soluk ve kenarligi kesikli. */
+.readonly-value {
+  width: 100%; padding: 10px 13px; font-size: 14px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--fg-muted); background: var(--bg);
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  word-break: break-all;
+}
+.input-row { display: flex; gap: 9px; align-items: center; }
+.input-row .input { flex: 1; }
+.unit { color: var(--fg-muted); font-size: 13px; white-space: nowrap; }
+
+.switch { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
+.switch input { margin: 3px 0 0; width: 17px; height: 17px; accent-color: var(--accent); flex-shrink: 0; }
+.switch .switch-text { flex: 1; }
+.switch .switch-text strong { display: block; font-weight: 560; font-size: 14px; }
+.switch .switch-text span { color: var(--fg-muted); font-size: 13px; }
+/* `.field label` (yukarida) ozgullukce `.switch`ten gucludur: duzeltilmezse
+   display:block kazanir, onay kutusu metnin USTUNE duser ve font-weight
+   miras alindigi icin yardim metni kalin gorunur. */
+.field label.switch { display: flex; font-weight: 400; margin-bottom: 0; }
+
+.form-grid { display: grid; gap: 17px; }
+
+/* --- Surukle-birak alani -------------------------------------------------- */
+
+.dropzone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  background: var(--surface);
+  padding: 52px 26px; text-align: center; cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+.dropzone:hover { border-color: var(--accent); }
+.dropzone.over {
+  border-color: var(--accent); background: var(--accent-soft);
+}
+.dropzone.has-error { border-color: var(--err); }
+.dropzone .dz-icon { color: var(--accent); margin-bottom: 14px; }
+.dropzone .dz-title { font-size: 17px; font-weight: 600; }
+.dropzone .dz-sub { color: var(--fg-muted); font-size: 14px; margin-top: 5px; }
+
+.file-chip {
+  display: flex; align-items: center; gap: 13px;
+  padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.file-chip .fc-icon {
+  width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft);
+  color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.file-chip .fc-main { flex: 1; min-width: 0; }
+.file-chip .fc-name { font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip .fc-size { color: var(--fg-muted); font-size: 13px; }
+
+/* --- Ilerleme ------------------------------------------------------------- */
+
+.progress { height: 7px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.progress > div { height: 100%; background: var(--accent); transition: width .18s ease; border-radius: 99px; }
+.progress.indeterminate > div { width: 40% !important; animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+
+/* --- Uyari kutulari ------------------------------------------------------- */
+
+.alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 15px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.5;
+}
+.alert + .alert { margin-top: 9px; }
+.alert.warn { background: var(--warn-soft); color: var(--warn); }
+.alert.err  { background: var(--err-soft);  color: var(--err); }
+.alert.ok   { background: var(--ok-soft);   color: var(--ok); }
+.alert.info { background: var(--accent-soft); color: var(--accent); }
+.alert svg { flex-shrink: 0; margin-top: 2px; }
+.alerts { margin-bottom: 20px; }
+
+/* --- Durum rozeti --------------------------------------------------------- */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 99px; font-size: 12px; font-weight: 560;
+  background: var(--surface-2); color: var(--fg-muted); white-space: nowrap;
+}
+.badge.active  { background: var(--ok-soft);   color: var(--ok); }
+.badge.expired { background: var(--warn-soft); color: var(--warn); }
+.badge.revoked { background: var(--err-soft);  color: var(--err); }
+.badge.purged  { background: var(--surface-2); color: var(--fg-muted); }
+.badge .dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+
+/* --- Sonuc ekrani --------------------------------------------------------- */
+
+.result-head { display: flex; gap: 17px; align-items: center; }
+.result-head .app-icon {
+  width: 66px; height: 66px; border-radius: 15px; object-fit: cover;
+  background: var(--surface-2); border: 1px solid var(--border); flex-shrink: 0;
+}
+.result-head .app-icon.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 600; color: var(--fg-muted);
+}
+.result-head .meta { min-width: 0; }
+.result-head .meta h2 { font-size: 20px; }
+.result-head .meta .sub { color: var(--fg-muted); font-size: 14px; }
+
+.link-box {
+  display: flex; gap: 9px; align-items: center;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 5px 5px 5px 13px;
+}
+.link-box code {
+  flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qr-panel { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.qr-panel img {
+  width: 168px; height: 168px; background: #fff; border-radius: 11px;
+  padding: 9px; border: 1px solid var(--border); flex-shrink: 0;
+}
+.qr-panel .qr-text { flex: 1; min-width: 210px; color: var(--fg-muted); font-size: 14px; }
+
+/* --- Surum listesi -------------------------------------------------------- */
+
+.build-list { display: flex; flex-direction: column; gap: 13px; }
+.build {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 15px 17px; box-shadow: var(--shadow);
+}
+.build-top { display: flex; gap: 13px; align-items: flex-start; }
+.build-icon {
+  width: 46px; height: 46px; border-radius: 11px; object-fit: cover; flex-shrink: 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.build-icon.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; font-weight: 600; color: var(--fg-muted);
+}
+.build-info { flex: 1; min-width: 0; }
+.build-title { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.build-title strong { font-size: 15.5px; font-weight: 600; }
+.build-sub {
+  color: var(--fg-muted); font-size: 13px; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.build-stats { display: flex; gap: 15px; color: var(--fg-muted); font-size: 12.5px; margin-top: 7px; flex-wrap: wrap; }
+.build-stats span { display: inline-flex; align-items: center; gap: 4px; }
+.build-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--border); }
+
+.build-edit {
+  margin-top: 13px; padding: 15px 17px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+
+/* Iki secenekli acma/kapama grubu (sure baslangici gibi). */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.seg label {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 6px 12px; font-size: 13px; color: var(--fg-muted); background: var(--surface);
+}
+.seg label + label { border-left: 1px solid var(--border); }
+.seg label.on { background: var(--accent-soft); color: var(--accent); font-weight: 560; }
+.seg input { accent-color: var(--accent); margin: 0; }
+
+.empty { text-align: center; padding: 56px 22px; color: var(--fg-muted); }
+.empty h3 { color: var(--fg); margin-bottom: 6px; }
+
+/* --- Ayar formu ----------------------------------------------------------- */
+
+/* Hatali alan: mesaj girdinin ALTINDA durur, sayfanin tepesinde degil. */
+.field.has-error .input,
+.field.has-error .textarea { border-color: var(--err); }
+.field-error { color: var(--err); font-size: 13px; margin-top: 6px; }
+
+/* Kaydedilmemis alani belli et: sol kenarda ince bir isaret. */
+.field.is-dirty { border-left: 2px solid var(--accent); padding-left: 11px; margin-left: -13px; }
+
+/* Sayi alanlarinin insan okunur karsiligi ("720 saat" -> "= 30 gun"). */
+.unit.hint { opacity: .75; font-variant-numeric: tabular-nums; }
+
+/* Form uzun oldugu icin kaydet dugmesi ekranin altina yapisir. */
+.save-bar {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; gap: 9px; align-items: center;
+  margin-top: 18px; padding: 13px 0;
+  background: linear-gradient(to top, var(--bg) 72%, transparent);
+}
+
+.confirm-row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+
+/* --- Ayar gruplari -------------------------------------------------------- */
+
+/* CSS ile buyutme YAPILMAZ. Sayfanin dili tr oldugu icin `text-transform:
+   uppercase` kurali i harfini noktali buyuk I'ya cevirir; ASCII yazilan
+   "Link davranisi" ekranda melez bir kelimeye donusur. Basliklar oldugu gibi
+   gosterilir, ayrimi punto ve renk saglar. */
+.group-title {
+  font-size: 13px; font-weight: 620;
+  color: var(--fg-muted); margin: 26px 0 11px;
+}
+/* Yalnizca karttaki ILK baslik icin gecerli olmali; bu yuzden gruplar
+   SettingsPage'de sarmalayici <div> ile degil <Fragment> ile uretilir. */
+.group-title:first-child { margin-top: 0; }
+
+/* --- Kucuk parcalar ------------------------------------------------------- */
+
+.spinner {
+  width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 99px; animation: spin .6s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: var(--fg); color: var(--bg);
+  padding: 11px 19px; border-radius: 99px; font-size: 14px; font-weight: 520;
+  box-shadow: var(--shadow); z-index: 100; animation: rise .18s ease;
+}
+@keyframes rise { from { opacity: 0; transform: translate(-50%, 9px); } }
+
+.center-screen {
+  min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 22px;
+}
+.login-card { width: 100%; max-width: 380px; }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 18px; font-size: 14px; }
+.kv dt { color: var(--fg-muted); }
+.kv dd { margin: 0; text-align: right; word-break: break-all; }
+
+.divider { height: 1px; background: var(--border); margin: 19px 0; }
+
+@media (max-width: 620px) {
+  .topbar { padding: 0 15px; gap: 11px; }
+  .nav a { padding: 7px 10px; font-size: 13px; }
+  .main { padding: 22px 15px 60px; }
+  .qr-panel { justify-content: center; }
+  .build-actions .btn { flex: 1; }
+}

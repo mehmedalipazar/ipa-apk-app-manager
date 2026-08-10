@@ -1,0 +1,174 @@
+{
+  "tarih": "2026-08-05T14:44:11.421Z",
+  "taban": "http://localhost:5173",
+  "sonuclar": [
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A2",
+      "baslik": "PORT okunuyor (belirtilen portta dinliyor)",
+      "gecti": true,
+      "detay": "port 50612 dinleniyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A3",
+      "baslik": "HOST okunuyor (127.0.0.1 disina acilmiyor)",
+      "gecti": true,
+      "detay": "192.168.20.91:50617 kapali, loopback acik"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A4",
+      "baslik": "DATA_DIR okunuyor (DB ve uploads orada olusuyor)",
+      "gecti": true,
+      "detay": "ipa-ota.db, ipa-ota.db-shm, ipa-ota.db-wal"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A5",
+      "baslik": "LOG_LEVEL okunuyor (debug vs fatal cikti farki)",
+      "gecti": true,
+      "detay": "debug=1201B  fatal=0B"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A6",
+      "baslik": "TRUST_PROXY okunuyor (X-Forwarded-For yorumlaniyor)",
+      "gecti": true,
+      "detay": "true→203.0.113.77 loglandi, false→loglanmadi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A7",
+      "baslik": "PUBLIC_BASE_URL temiz DB de config.baseUrl a aktariliyor",
+      "gecti": true,
+      "detay": "env → DB bosken okundu"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A8",
+      "baslik": "PUBLIC_BASE_URL, DB de deger varken YOK SAYILIYOR (bilincli)",
+      "gecti": true,
+      "detay": "DB > env onceligi dogru"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A9",
+      "baslik": "PUBLIC_BASE_URL sondaki / karakterleri kirpiliyor",
+      "gecti": true,
+      "detay": "kirpma calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A10",
+      "baslik": "ADMIN_PASSWORD ilk acilista okunuyor (giris yapilabiliyor)",
+      "gecti": true,
+      "detay": "giris basarili"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A11",
+      "baslik": "ADMIN_PASSWORD sonraki aciliste YOK SAYILIYOR (panelden degisen sifre korunur)",
+      "gecti": true,
+      "detay": "env sifre restart ta geri gelmiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A12",
+      "baslik": "ADMIN_PASSWORD_FORCE_RESET=true env sifresini geri yukluyor",
+      "gecti": true,
+      "detay": "sifirlama calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A13",
+      "baslik": "ADMIN_PASSWORD 12 karakterden kisa ise acilista hata",
+      "gecti": true,
+      "detay": "acilista reddedildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A14",
+      "baslik": "SESSION_SECRET degisimi aktif oturumlari dusuruyor",
+      "gecti": true,
+      "detay": "oturum gecersiz kilindi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A16",
+      "baslik": "NODE_ENV=production + SESSION_SECRET yok → acilista hata",
+      "gecti": true,
+      "detay": "prod korumasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A17",
+      "baslik": "NODE_ENV=development + SESSION_SECRET yok → uyari ile kalkiyor",
+      "gecti": true,
+      "detay": "gecici anahtar uretildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A16b",
+      "baslik": "NODE_ENV=production + ADMIN_PASSWORD yok → acilista hata",
+      "gecti": true,
+      "detay": "prod korumasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A18",
+      "baslik": "Gecersiz LOG_LEVEL acilista reddediliyor",
+      "gecti": true,
+      "detay": "zod dogrulamasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A19",
+      "baslik": "Gecersiz PORT acilista reddediliyor",
+      "gecti": true,
+      "detay": "aralik dogrulamasi calisiyor"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A20",
+      "baslik": "NODE_ENV log bicimini degistiriyor (dev: pretty, prod: JSON)",
+      "gecti": true,
+      "detay": "prod=JSON, dev=pretty"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A21",
+      "baslik": "CORS_ORIGINS okunuyor (izinli origin CORS basligi aliyor)",
+      "gecti": true,
+      "detay": "izinli origin yansitildi, izinsiz reddedildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A21b",
+      "baslik": "Gecersiz CORS_ORIGINS (yol iceren adres) sunucuyu dusuruyor",
+      "gecti": true,
+      "detay": "baslangicta reddedildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A21c",
+      "baslik": "CORS_ORIGINS doluysa oturum cerezi SameSite=None; Secure oluyor",
+      "gecti": true,
+      "detay": "HttpOnly; Secure; SameSite=None"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A22",
+      "baslik": "Bilinmeyen ortam degiskeni yok sayiliyor",
+      "gecti": true,
+      "detay": "yok sayildi"
+    },
+    {
+      "grup": "A — Ortam degiskeni okuma",
+      "id": "A1",
+      "baslik": "Yukleme sirasi: .env → .env.local → shell (sonuncu kazanir)",
+      "gecti": true,
+      "detay": "A=env, B=local, C=shell — sira dogru; dev+start scriptleri de ayni"
+    }
+  ]
+}
