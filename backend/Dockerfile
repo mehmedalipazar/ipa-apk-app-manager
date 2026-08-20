@@ -1,12 +1,15 @@
 # =============================================================================
-#  ipa-ota-download — backend imaji (Fastify)
+#  ipa-ota-download — BACKEND imaji (Fastify)
 #
-#  Yalnizca API (/api/*) ve OTA kurulum uclarini sunar. Admin arayuzu ayri bir
-#  imajdadir (frontend/Dockerfile) ve aralarinda container-ici trafik yoktur.
+#  Yalnizca API (/api/*) ve OTA kurulum uclarini sunar. Admin arayuzu AYRI BIR
+#  SERVISTIR (../frontend), aralarinda container-ici trafik yoktur.
 #
-#  Derleme baglami depo koku olmalidir — npm workspaces kok package.json ve
-#  package-lock.json'a ihtiyac duyar:
-#      docker build -f backend/Dockerfile .
+#  DERLEME BAGLAMI BU DIZINDIR — depo koku DEGIL:
+#      cd backend && docker build -t ipa-ota-api:latest .
+#      cd backend && docker compose up -d --build
+#
+#  npm workspaces KALDIRILDI: backend'in kendi package.json + package-lock.json
+#  dosyasi vardir, kok dizindeki hicbir dosyaya ihtiyac duymaz.
 #
 #  Debian tabanli imaj (Alpine degil): better-sqlite3 yerel bir eklenti
 #  oldugundan derleme ve calisma asamalari ayni libc uzerinde olmali.
@@ -23,17 +26,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Once yalnizca manifest dosyalari: kaynak degistiginde npm ci yeniden
-# calismasin diye katman onbellegi korunur.
+# calismasin diye katman onbellegi korunur. (Glob: lock yoksa COPY patlamasin,
+# hatayi anlasilir bicimde npm ci versin.)
 COPY package.json package-lock.json* ./
-COPY backend/package.json ./backend/
-COPY frontend/package.json ./frontend/
 
 RUN npm ci
 
-COPY tsconfig.base.json ./
-COPY backend ./backend
+# Kaynak + tsconfig + .env.production. Ne kopyalandigini .dockerignore belirler
+# (node_modules, dist, data-docker ve .env disarida kalir).
+COPY . .
 
-RUN npm run build --workspace=backend
+RUN npm run build
 
 # Uretim bagimliliklarini ayikla
 RUN npm prune --omit=dev
@@ -49,24 +52,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# npm workspaces bagimliliklari kok node_modules'a toplar (hoisting);
-# backend/ altinda ayri bir node_modules olusmaz. Node, /app/backend/dist'ten
-# yukari yuruyerek /app/node_modules'i bulur.
+# Tek workspace oldugu icin duz yerlesim: /app/node_modules, /app/dist.
+# (Eskiden npm workspaces yuzunden /app/backend/dist ic ice duruyordu.)
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/backend/package.json ./backend/package.json
-COPY --from=builder /app/backend/dist ./backend/dist
+COPY --from=builder /app/dist ./dist
 
 # Uretim varsayilanlari imaja gomulur. SIR ICERMEZ — ADMIN_PASSWORD ve
 # SESSION_SECRET docker compose'un `environment:` blogundan gelir ve gercek
 # ortam degiskeni bu dosyadaki her degeri EZER.
-COPY --from=builder /app/backend/.env.production ./backend/.env.production
+COPY --from=builder /app/.env.production ./.env.production
 
-# Veri dizini: SQLite + yuklenen IPA dosyalari. Host'a baglanmali.
+# Veri dizini: SQLite + yuklenen IPA dosyalari. Host'a baglanmali
+# (compose: ./data-docker:/data).
 RUN mkdir -p /data && chown -R node:node /data /app
 
 USER node
-WORKDIR /app/backend
 
 EXPOSE 3000
 
@@ -74,5 +75,6 @@ HEALTHCHECK --interval=30s --timeout=4s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["dumb-init", "--"]
-# .env.production -> .env.local -> gercek ortam degiskeni (sonraki ezer)
+# .env.production -> .env.local -> gercek ortam degiskeni (sonraki ezer).
+# NOT: `.env` BILEREK OKUNMAZ — o dosya yalnizca docker compose'a aittir.
 CMD ["node", "--env-file-if-exists=.env.production", "--env-file-if-exists=.env.local", "dist/index.js"]

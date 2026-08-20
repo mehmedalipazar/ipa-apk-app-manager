@@ -64,14 +64,12 @@ const EnvSchema = z.object({
   SESSION_SECRET: z.string().default(''),
 
   /**
-   * Admin arayuzunun origin'leri — virgulle ayrilir.
+   * API'ye ayri origin'den baglanmasina izin verilen arayuzler — virgulle
+   * ayrilir (orn. yerel gelistirme arayuzu http://localhost:5173).
    *
-   * BOS BIRAKIN: arayuz ile API ayni origin uzerinden (ters proxy ile)
-   * sunuluyorsa dogru olan budur. Liste dolduran her deger, oturum cerezini
-   * SameSite=None'a zorlar ve gereksiz yere zayiflatir.
-   *
-   * Yalnizca arayuz gercekten ayri bir adreste calisiyorsa doldurun
-   * (orn. gelistirmede http://localhost:5173).
+   * Liste doluyken oturum cerezi SameSite=None olur; CSRF korumasi
+   * server.ts'teki Origin dogrulama katmaniyla saglanir. Arayuz yalnizca
+   * ayni origin'den sunuluyorsa bos birakin — cerez SameSite=Lax kalir.
    */
   CORS_ORIGINS: z
     .string()

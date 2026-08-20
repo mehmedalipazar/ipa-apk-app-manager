@@ -1,0 +1,138 @@
+# =============================================================================
+#  ipa-ota-download / BACKEND — bagimsiz servis
+#
+#      cd backend
+#      cp .env.example .env        # sirlari doldurun
+#      docker compose up -d --build
+#
+#  API (/api/*) + OTA kurulum uclarini (/api/i/*) sunar.
+#
+#  FRONTEND BU DOSYADA YOKTUR ve olmamalidir. Arayuz tamamen ayri bir
+#  servistir, kendi ../frontend/docker-compose.yml dosyasiyla ayaga kalkar.
+#  Ikisi arasinda container-ici trafik yoktur, ortak ag yoktur, ortak .env
+#  yoktur. Tek bag HTTP'dir ve o da onlerindeki ters proxy uzerinden kurulur.
+#
+#  TERS PROXY BU DOSYADA YOKTUR — devops tarafinda nginx ile yapilandirilir.
+#  Beklenen yonlendirme (ayni alan adi altinda):
+#      https://ipa-ios.simurgbilisim.com/        ->  frontend servisi (:5173)
+#      https://ipa-ios.simurgbilisim.com/api/*   ->  bu servis        (:3000)
+#  INSTALL_PATH_PREFIX=/api/i tam da bu yuzden: kurulum uclari da tek bir
+#  /api/* kurali uzerinden gecsin diye.
+#
+#  YAPILANDIRMA KAYNAGI:
+#    - Uretim varsayilanlari  ->  .env.production (imaja gomulu)
+#    - Sirlar ve ezmeler      ->  asagidaki environment: blogu (.env'den okur)
+#  Gercek ortam degiskeni imajdaki dosyayi her zaman EZER.
+# =============================================================================
+
+# Proje adi acikca sabitlenir. Aksi halde compose dizin adini ("backend")
+# kullanir ve frontend tarafiyla karisir.
+name: ipa-ota-backend
+
+services:
+  api:
+    build:
+      # Baglam ARTIK DEPO KOKU DEGIL, bu dizin. Backend kendi package.json ve
+      # package-lock.json dosyasina sahiptir; npm workspaces kaldirildi.
+      context: .
+      dockerfile: Dockerfile
+    image: ipa-ota-api:latest
+    container_name: ipa-ota-api
+    restart: unless-stopped
+    environment:
+      # --- Sirlar (bu dizindeki .env dosyasindan) ---
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD tanimlanmali - backend/.env dosyasina yazin}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET tanimlanmali - openssl rand -hex 32}
+      ADMIN_PASSWORD_FORCE_RESET: ${ADMIN_PASSWORD_FORCE_RESET:-false}
+
+      # --- Istege bagli ezmeler ---
+      # Bos birakilirsa .env.production icindeki degerler gecerli olur.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://ipa-ios.simurgbilisim.com}
+      INSTALL_PATH_PREFIX: ${INSTALL_PATH_PREFIX:-/api/i}
+      # Arayuzun origin'i. Ayni alan adi altinda sunuluyorsa BOS birakin.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Ters proxy arkasindayiz — X-Forwarded-* basliklarina guvenilir.
+      # Proxy YOKSA false yapin: aksi halde istemci kendi IP'sini uydurabilir.
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+
+      # NODE_ENV / PORT / DATA_DIR BILEREK BURADA DEGIL: kaynaklari imaja
+      # gomulu .env.production. Compose'da listelenmedikleri icin backend/.env
+      # dosyasindaki ayni adli bir degisken container'a HIC ULASMAZ.
+    volumes:
+      # SQLite veritabani + yuklenen IPA dosyalari.
+      #
+      # BIND MOUNT (adlandirilmis volume DEGIL): veriler host'ta
+      # backend/data-docker icinde durur, boylece SQLite dosyasi dogrudan
+      # acilabilir — AMA YALNIZCA container DURDURULDUKTAN SONRA:
+      #     docker compose stop api
+      #     sqlite3 data-docker/ipa-ota.db "select app_name, version from builds;"
+      #
+      # Container CALISIRKEN host'tan sqlite3 ile baglanmak VERI KAYBETTIRIR:
+      # POSIX kilitleri bind mount uzerinden gecmez, host tarafi kendini yalniz
+      # sanip WAL'i budar ve container'in commit'lerini siler.
+      #
+      # BU DIZINI YEDEKLEYIN — git'e girmez.
+      - ./data-docker:/data
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  # ===========================================================================
+  #  dbadmin — SQLite tarayici arayuzu.  SALT OKUNUR ve VARSAYILAN OLARAK KAPALI.
+  #
+  #      cd backend
+  #      docker compose --profile dbadmin up -d dbadmin     # ac
+  #      docker compose --profile dbadmin stop dbadmin      # kapat
+  #      -> http://127.0.0.1:8081   (sifre: backend/.env icindeki DBADMIN_PASSWORD)
+  #
+  #  Kalici acmak icin backend/.env dosyasina  COMPOSE_PROFILES=dbadmin  yazin;
+  #  o zaman duz `docker compose up -d` bu servisi de baslatir.
+  #
+  #  ---------------------------------------------------------------------
+  #  NEDEN SALT OKUNUR?  (2026-08-13'te bu makinede olculdu, tahmin degil)
+  #  ---------------------------------------------------------------------
+  #  POSIX kilitleri Docker Desktop'in bind mount katmanindan (fakeowner /
+  #  /run/host_mark) GECMEZ. Ikinci bir process ayni veritabanina YAZARSA:
+  #
+  #    - kilit tutan tarafin BEGIN IMMEDIATE kilidinin icinden yazabildi,
+  #    - kilit tutan taraf COMMIT'te "locking protocol" (errcode 15) ile oldu,
+  #    - o islemin verisi KAYBOLDU.
+  #
+  #  Ayni sonuc TEK container icindeki iki process ile de cikti; yani sorun
+  #  container izolasyonu degil, bind mount'un kendisi. VirtioFS zaten acik,
+  #  cevrilecek bir Docker ayari yok.
+  #
+  #  OKUMA ise guvenli olcuLdu: yazar 200 satiri checkpoint etmeden tutarken
+  #  ikinci process hepsini gordu ve kapanisi hicbir seyi bozmadi.
+  #
+  #  Bu yuzden `-r` (read-only) bayragi BU SERVISIN GUVENLIK SINIRIDIR.
+  #  KALDIRMAYIN. Yazma yetkisi gerekiyorsa dogru cozum veritabanini
+  #  adlandirilmis bir volume'e tasimaktir (orada kilitler dogru calisiyor —
+  #  rakip yazar "database is locked" alip bekledi, veri kaybi olmadi).
+  # ===========================================================================
+  dbadmin:
+    # Profil sayesinde duz `docker compose up -d` bu servisi BASLATMAZ.
+    profiles: ["dbadmin"]
+    image: coleifer/sqlite-web:latest
+    # Imaj yalnizca amd64; bu Mac arm64 oldugu icin emulasyonla calisir.
+    # Yonetim araci oldugu icin yavasligi onemsiz, ama acikca belirtiyoruz ki
+    # compose her seferinde platform uyarisi basmasin.
+    platform: linux/amd64
+    container_name: ipa-ota-dbadmin
+    restart: unless-stopped
+    environment:
+      # -P bayragi sifreyi bu degiskenden okur; tanimsizsa compose durur.
+      SQLITE_WEB_PASSWORD: ${DBADMIN_PASSWORD:?DBADMIN_PASSWORD tanimlanmali - backend/.env dosyasina yazin}
+    # -r : salt okunur (bkz. yukaridaki olcum)   -x : tarayici acmaya calisma
+    # -P : sifre sor (SQLITE_WEB_PASSWORD'dan okur)
+    command: sqlite_web -H 0.0.0.0 -p 8080 -x -r -P /data/ipa-ota.db
+    volumes:
+      # DIKKAT: bilerek `:ro` DEGIL. WAL modunda bir OKUYUCU bile -shm
+      # dosyasina (wal-index) yazabilmek zorundadir; salt okunur mount ile
+      # veritabani hic acilamaz. Okuma sinirini mount degil, `-r` bayragi koyar.
+      - ./data-docker:/data
+    ports:
+      # Varsayilan olarak YALNIZCA bu makineden erisilir. Bu Mac uretim
+      # sunucusudur; arayuzu LAN'a acmak icin DBADMIN_BIND=0.0.0.0 yapmaniz
+      # gerekir — sifre disinda hicbir koruma katmani yoktur, dikkatli olun.
+      - "${DBADMIN_BIND:-127.0.0.1}:${DBADMIN_PORT:-8081}:8080"

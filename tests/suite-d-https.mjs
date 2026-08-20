@@ -147,10 +147,12 @@ export async function calistir({ domain } = {}) {
     bekle(oturum, 'Set-Cookie gelmedi');
     bekle(/HttpOnly/i.test(oturum), 'HttpOnly yok — JS cerezi okuyabilir');
     bekle(/Secure/i.test(oturum), 'Secure yok');
-    // Uretimde CORS_ORIGINS bos => arayuz ayni origin'den sunulur ve env.ts'in
-    // 'auto' kurali cerezi SameSite=Lax yapar. None gorulmesi CORS listesinin
-    // yanlislikla dolduruldugunu (cerezin zayifladigini) gosterir.
-    bekle(/SameSite=Lax/i.test(oturum), `SameSite=Lax bekleniyordu: ${oturum}`);
+    // 2026-08-10 karari: CORS_ORIGINS http://localhost:5173'u listeler (yerel
+    // gelistirme arayuzu canli API'ye baglanir); env.ts'in 'auto' kurali cerezi
+    // SameSite=None yapar. CSRF korumasi Origin dogrulama katmanindadir
+    // (D3.8/D3.9). Lax gorulmesi CORS listesinin bosaldigini, yani dev
+    // arayuzunun artik baglanamayacagini gosterir.
+    bekle(/SameSite=None/i.test(oturum), `SameSite=None bekleniyordu: ${oturum}`);
     return { detay: oturum.split(';').slice(1).join(';').trim() };
   });
 
@@ -159,16 +161,15 @@ export async function calistir({ domain } = {}) {
     esit(r.govde?.authenticated, true, 'authenticated');
   });
 
-  await test('D3.5', 'CORS uretimde tamamen kapali (bos CORS_ORIGINS)', async () => {
-    // server.ts @fastify/cors'u yalnizca liste doluyken kaydeder. Uretimde SPA
-    // ayni origin'den sunuldugu icin liste bos birakilir; localhost:5173 bile
-    // izin almamalidir. Izin gorulurse listeye origin eklenmis demektir — bu
-    // da cerezi SameSite=None'a zayiflatir (bkz. D3.3).
+  await test('D3.5', 'CORS: yerel gelistirme arayuzune izin veriliyor', async () => {
+    // 2026-08-10 karari: kok .env CORS_ORIGINS=http://localhost:5173 tasir,
+    // boylece dev arayuzu canli API'ye baglanabilir. Basliklarin gelmemesi
+    // listenin bosaldigini (dev akisinin koptugunu) gosterir.
     const r = await fetch(`${TABAN}/api/auth/me`, {
       headers: { Origin: 'http://localhost:5173' },
     });
-    esit(r.headers.get('access-control-allow-origin'), null, 'allow-origin');
-    esit(r.headers.get('access-control-allow-credentials'), null, 'allow-credentials');
+    esit(r.headers.get('access-control-allow-origin'), 'http://localhost:5173', 'allow-origin');
+    esit(r.headers.get('access-control-allow-credentials'), 'true', 'allow-credentials');
   });
 
   await test('D3.6', 'CORS: izinsiz origin reddediliyor', async () => {
@@ -179,10 +180,10 @@ export async function calistir({ domain } = {}) {
     bekle(izin !== 'https://kotu-site.example', `Izinsiz origin kabul edilmis: ${izin}`);
   });
 
-  await test('D3.7', 'CORS preflight taninmiyor (ayni-origin tasarim)', async () => {
-    // Ayni origin'de tarayici hicbir zaman preflight gondermez; cors eklentisi
-    // kayitli olmadigindan OPTIONS ucu da yoktur. Preflight'in izin almadan
-    // dusmesi dogru uretim durusudur.
+  await test('D3.7', 'CORS preflight izinli origin icin calisiyor', async () => {
+    // Dev arayuzunun JSON govdeli PUT/PATCH istekleri preflight'a girer;
+    // @fastify/cors kayitli oldugundan OPTIONS yaniti izin basliklariyla
+    // donmelidir. 404/izinsiz donmesi dev akisinin koptugunu gosterir.
     const r = await fetch(`${TABAN}/api/settings`, {
       method: 'OPTIONS',
       headers: {
@@ -191,8 +192,36 @@ export async function calistir({ domain } = {}) {
         'Access-Control-Request-Headers': 'content-type',
       },
     });
-    esit(r.status, 404, 'status (OPTIONS ucu yok)');
-    esit(r.headers.get('access-control-allow-origin'), null, 'allow-origin');
+    bekle(r.status === 204 || r.status === 200, `preflight durumu: ${r.status}`);
+    esit(r.headers.get('access-control-allow-origin'), 'http://localhost:5173', 'allow-origin');
+    const metotlar = r.headers.get('access-control-allow-methods') ?? '';
+    bekle(/PUT/.test(metotlar), `allow-methods PUT icermiyor: ${metotlar}`);
+  });
+
+  await test('D3.8', 'Origin korumasi: yabanci origin yazma istegi 403', async () => {
+    // SameSite=None cerezle CSRF'i engelleyen katman: durum degistiren
+    // isteklerde taninmayan Origin dogrudan 403 almali — kimlik denetimine
+    // bile ulasmadan. (Origin gondermeyen curl/test istemcileri D3.1-D3.3'te
+    // zaten gectigi icin ayrica test edilmiyor.)
+    const r = await fetch(`${TABAN}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Origin: 'https://kotu-site.example' },
+      body: JSON.stringify({ password: 'yanlis' }),
+    });
+    esit(r.status, 403, 'status');
+  });
+
+  await test('D3.9', 'Origin korumasi: izinli origin\'ler geciriliyor', async () => {
+    // Ayni istek izinli origin'lerle 403 DEGIL, normal kimlik hatasi (401)
+    // almali: katman yalnizca yabanci origin'leri suzuyor.
+    for (const origin of ['http://localhost:5173', new URL(TABAN).origin]) {
+      const r = await fetch(`${TABAN}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Origin: origin },
+        body: JSON.stringify({ password: 'yanlis-sifre-origin-testi' }),
+      });
+      esit(r.status, 401, `status (Origin: ${origin})`);
+    }
   });
 
   /* ===================================================================== */

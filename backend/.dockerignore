@@ -1,0 +1,16 @@
+# Derleme baglami ARTIK BU DIZIN (depo koku degil).
+node_modules
+dist
+.git
+
+# Veri — asla imaja girmemeli (35 MB+ ve canli uretim verisi).
+data
+data-docker
+
+# Sirlar. .env yalnizca docker compose icindir ve imajda isi yoktur;
+# .env.production BILEREK DISARIDA BIRAKILMAZ (sir icermez, imaja gomulur).
+.env
+.env.local
+
+*.log
+.DS_Store

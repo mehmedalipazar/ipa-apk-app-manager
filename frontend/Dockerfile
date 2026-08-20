@@ -1,11 +1,17 @@
 # =============================================================================
-#  ipa-ota-download — admin arayuzu imaji (nginx + statik SPA)
+#  ipa-ota-download — FRONTEND imaji (nginx + statik SPA)
 #
-#  Derleme baglami depo koku olmalidir — npm workspaces kok package.json ve
-#  package-lock.json'a ihtiyac duyar:
-#      docker build -f frontend/Dockerfile .
+#  Yalnizca admin arayuzunu sunar. API AYRI BIR SERVISTIR (../backend) ve bu
+#  imajin ondan hicbir haberi yoktur — ne derlemede ne calismada.
 #
-#  API ADRESI: uretimde GORELI YOL kullanilir (frontend/.env.production icinde
+#  DERLEME BAGLAMI BU DIZINDIR — depo koku DEGIL:
+#      cd frontend && docker build -t ipa-ota-web:latest .
+#      cd frontend && docker compose up -d --build
+#
+#  npm workspaces KALDIRILDI: frontend'in kendi package.json + package-lock.json
+#  dosyasi vardir, kok dizindeki hicbir dosyaya ihtiyac duymaz.
+#
+#  API ADRESI: uretimde GORELI YOL kullanilir (.env.production icinde
 #  VITE_API_BASE_URL bostur). Yani imaj alan adindan bagimsizdir ve adres
 #  degisince yeniden derlenmesi gerekmez — ONDEKI ters proxy `/api/*` yolunu
 #  backend'e yonlendirdigi surece calisir.
@@ -18,20 +24,21 @@ FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
+# Once yalnizca manifest dosyalari: kaynak degistiginde npm ci yeniden
+# calismasin diye katman onbellegi korunur. (Glob: lock yoksa COPY patlamasin,
+# hatayi anlasilir bicimde npm ci versin.)
 COPY package.json package-lock.json* ./
-COPY backend/package.json ./backend/
-COPY frontend/package.json ./frontend/
 
-# Yalnizca frontend workspace'inin bagimliliklari — backend'in yerel eklentileri
-# (better-sqlite3) burada derlenmesin diye.
-RUN npm ci --workspace=frontend --include-workspace-root
+RUN npm ci
 
-COPY tsconfig.base.json ./
-COPY frontend ./frontend
+# Kaynak + index.html + vite.config.ts + tsconfig.json + .env.production.
+# Ne kopyalandigini .dockerignore belirler (node_modules, dist, .env ve
+# .env.development disarida kalir).
+COPY . .
 
-# `vite build` varsayilan olarak mode=production kullanir ve
-# frontend/.env.production dosyasini okur (VITE_API_BASE_URL bos => goreli yol).
-RUN npm run build --workspace=frontend
+# `vite build` varsayilan olarak mode=production kullanir ve .env.production
+# dosyasini okur (VITE_API_BASE_URL bos => goreli yol).
+RUN npm run build
 
 
 # --- 2) Calisma imaji ---------------------------------------------------------
@@ -40,10 +47,11 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
 USER root
 
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY frontend/guvenlik-basliklari.conf /etc/nginx/snippets/guvenlik-basliklari.conf
+# Kaynak yollari artik "frontend/" oneki TASIMAZ — baglam bu dizin.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY guvenlik-basliklari.conf /etc/nginx/snippets/guvenlik-basliklari.conf
 
-COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 RUN chown -R 101:101 /usr/share/nginx/html
 

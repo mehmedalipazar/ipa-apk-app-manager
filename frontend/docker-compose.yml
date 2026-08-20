@@ -1,0 +1,45 @@
+# =============================================================================
+#  ipa-ota-download / FRONTEND — bagimsiz servis
+#
+#      cd frontend
+#      cp .env.example .env        # host portu (istege bagli)
+#      docker compose up -d --build
+#
+#  Admin arayuzunu (statik React SPA) nginx ile sunar.
+#
+#  BACKEND BU DOSYADA YOKTUR ve olmamalidir. API tamamen ayri bir servistir,
+#  kendi ../backend/docker-compose.yml dosyasiyla ayaga kalkar. Ikisi arasinda
+#  container-ici trafik yoktur, ortak ag yoktur, ortak .env yoktur.
+#
+#  ARAYUZ API'YE NASIL ULASIR?
+#  Uretimde GORELI YOL ile (/api/...). Onlerindeki ters proxy ayni alan adi
+#  altinda ikiye ayirir:
+#      https://ipa-ios.simurgbilisim.com/        ->  bu servis        (:5173)
+#      https://ipa-ios.simurgbilisim.com/api/*   ->  backend servisi  (:3000)
+#  Bu yuzden imaj alan adindan BAGIMSIZDIR ve adres degisince yeniden
+#  derlenmesi gerekmez. Adresi degistirmek isterseniz .env.production icindeki
+#  VITE_API_BASE_URL'i doldurun ve imaji yeniden derleyin (derleme zamani bir
+#  karardir, calisma zamani degil).
+# =============================================================================
+
+# Proje adi acikca sabitlenir. Aksi halde compose dizin adini ("frontend")
+# kullanir ve backend tarafiyla karisir.
+name: ipa-ota-frontend
+
+services:
+  web:
+    build:
+      # Baglam ARTIK DEPO KOKU DEGIL, bu dizin. Frontend kendi package.json ve
+      # package-lock.json dosyasina sahiptir; npm workspaces kaldirildi.
+      context: .
+      dockerfile: Dockerfile
+    image: ipa-ota-web:latest
+    container_name: ipa-ota-web
+    restart: unless-stopped
+    # Bu servisin CALISMA ZAMANI ortam degiskeni YOKTUR: API adresi derleme
+    # zamaninda paketlenir (bkz. .env.production). Eski calisma zamani
+    # yapilandirmasi (/config.js + window.__IPA_OTA_CONFIG__) KALDIRILDI.
+    ports:
+      # Sol taraf host portu (.env icindeki WEB_PORT); sag taraf container
+      # icindeki nginx — sabit 8080.
+      - "${WEB_PORT:-5173}:8080"

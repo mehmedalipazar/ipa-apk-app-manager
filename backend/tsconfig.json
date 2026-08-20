@@ -1,6 +1,29 @@
 {
-  "extends": "../tsconfig.base.json",
+  // Bu dosya KENDI KENDINE YETER — kokteki tsconfig.base.json kaldirildi.
+  // Backend bagimsiz bir servistir; derleme ayarlarini disaridan almaz.
   "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    // Kaynak kodda import yollari `.ts` ile yazilir; boylece Node dosyalari
+    // derlemeden dogrudan calistirabilir (`node --experimental-strip-types`).
+    // Derleme sirasinda tsc bu uzantilari `.js` olarak yeniden yazar.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "sourceMap": true,
+
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"]

@@ -2,9 +2,12 @@
  * Fastify uygulamasinin montaji.
  *
  * Bu surec YALNIZCA API'yi (/api/*) ve OTA kurulum uclarini sunar; admin
- * arayuzu ayri bir serviste (nginx) yayinlanir. Ikisi uretimde ayni alan adi
- * altinda birlestirilir (ters proxy: `/api/*` -> bu servis, `/` -> arayuz),
- * boylece tarayici goreli yol kullanir ve CORS'a hic gerek kalmaz.
+ * arayuzu ayri bir serviste (nginx) yayinlanir. Uretimde ikisi ayni alan adi
+ * altinda birlesir (ters proxy: `/api/*` -> bu servis, `/` -> arayuz); ayrica
+ * CORS_ORIGINS ile listelenen ayri origin'ler (orn. yerel gelistirme arayuzu
+ * http://localhost:5173) API'ye dogrudan baglanabilir. CORS acikken cerez
+ * SameSite=None oldugu icin CSRF korumasi asagidaki Origin dogrulama
+ * katmaniyla saglanir.
  *
  * Rotalar burada tek tek yazilmaz: `modules/index.ts` icindeki kayit defteri
  * gezilir. Yeni modul eklemek bu dosyayi degistirmez.
@@ -56,6 +59,35 @@ export async function buildServer(ctx: AppContainer): Promise<FastifyInstance> {
     app.log.info({ origins: env.CORS_ORIGINS }, 'CORS acik (ayri origin modu)');
   } else {
     app.log.info('CORS kapali — arayuz ayni origin uzerinden sunuluyor varsayiliyor.');
+  }
+
+  /* --- Origin dogrulamasi (CSRF korumasi) ----------------------------------- */
+  // CORS acikken oturum cerezi SameSite=None olur ve tarayici cerezi yabanci
+  // sitelerin tetikledigi isteklere de ekler. Preflight'a girmeyen "basit"
+  // istekler (orn. multipart form POST) CORS'a ragmen sunucuda CALISIR — CORS
+  // yalnizca yanitin okunmasini engeller. Bu kapiyi Origin dogrulamasi kapatir:
+  // durum degistiren isteklerde Origin basligi varsa izinli listede olmali.
+  // Origin gondermeyen istemciler (curl, testler, installd) etkilenmez; onlar
+  // tarayici degildir, uzerlerinde tasinan ortam cerezi de yoktur.
+  {
+    const izinliOriginler = new Set<string>(env.CORS_ORIGINS);
+    try {
+      izinliOriginler.add(new URL(env.PUBLIC_BASE_URL).origin);
+    } catch {
+      // PUBLIC_BASE_URL bos/gecersizse ayni-origin girisi eklenemez; CORS
+      // listesi yine gecerlidir.
+    }
+    const korunanMetotlar = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+    app.addHook('onRequest', async (request, reply) => {
+      if (!korunanMetotlar.has(request.method)) return;
+      const origin = request.headers.origin;
+      if (origin === undefined) return;
+      if (!izinliOriginler.has(origin)) {
+        request.log.warn({ origin, yol: request.url }, 'Yabanci Origin reddedildi');
+        return reply.code(403).send({ error: 'Origin dogrulanamadi.' });
+      }
+    });
   }
 
   await app.register(cookie);

@@ -5,14 +5,18 @@ dist/
 coverage/
 
 # --- Veri (SQLite + yuklenen IPA'lar) ----------------------------------------
-# backend/data       : yerel gelistirme
-# data-docker        : docker compose bind mount
+# backend/data          : yerel gelistirme
+# backend/data-docker   : docker compose bind mount (2026-08-13'te kokten tasindi)
 data/
 data-docker/
 
 # --- Ortam dosyalari ----------------------------------------------------------
-# .env.development ve .env.production DEPOYA GIRER (sir icermezler).
-# Sirlar ve makineye ozel degerler yalnizca .env.local dosyalarindadir.
+# Kokte .env YOKTUR. Her servis kendi .env dosyasina sahiptir:
+#     backend/.env    -> backend/docker-compose.yml icin (SIR ICERIR)
+#     frontend/.env   -> frontend/docker-compose.yml icin (yalnizca WEB_PORT)
+# Asagidaki desenler egik cizgi icermedigi icin HER DERINLIKTE eslesir.
+#
+# .env.development, .env.production ve .env.example DEPOYA GIRER (sirsizdirlar).
 .env
 .env.local
 .env.*.local

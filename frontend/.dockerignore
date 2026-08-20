@@ -1,0 +1,14 @@
+# Derleme baglami ARTIK BU DIZIN (depo koku degil).
+node_modules
+dist
+.git
+
+# .env yalnizca docker compose icindir (host portu) ve derlemede isi yoktur.
+# .env.development de disarida: `vite build` mode=production ile calisir,
+# .env.production yeterlidir ve o BILEREK imaja girer (sir icermez).
+.env
+.env.local
+.env.development
+
+*.log
+.DS_Store

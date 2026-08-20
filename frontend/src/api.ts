@@ -17,9 +17,12 @@
  *                         oturum cerezi SameSite=Lax kalabiliyor.
  *
  *   .env.development  ->  https://ipa-ios.simurgbilisim.com
- *                         Yerel arayuz uretimdeki API'ye konusur.
- *                         Yerel backend'e baglanmak icin .env.local icinde
- *                         VITE_API_BASE_URL=http://localhost:3000 yazin.
+ *                         Arayuz (5173) CANLI API'ye CORS ile konusur;
+ *                         uretim CORS_ORIGINS'i 5173'u listeler ve CSRF
+ *                         korumasi backend'in Origin dogrulama katmanindadir
+ *                         (bilincli karar, 2026-08-10). Yerel backend ile
+ *                         calismak icin .env.local:
+ *                             VITE_API_BASE_URL=http://localhost:3000
  *
  * Calisma zamani yapilandirmasi (eski window.__IPA_OTA_CONFIG__ / config.js)
  * KALDIRILDI: uretimde adres zaten goreli, ayarlanacak bir sey yok.

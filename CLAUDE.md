@@ -6,27 +6,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Self-hosted iOS OTA (over-the-air) IPA distribution service. Admin uploads an `.ipa`, gets a
 time-limited shareable link; the recipient opens it in Safari on an iPhone and installs in one tap.
-npm workspaces monorepo: `backend` (Fastify API) + `frontend` (React SPA).
+
+**Two fully independent services in one repo** (restructured 2026-08-13): `backend` (Fastify API)
+and `frontend` (React SPA). There is **no root-level build structure** — no root `package.json`, no
+npm workspaces, no shared lockfile, no root `tsconfig.base.json`, no root `.env`, no root
+`docker-compose.yml`. Each folder installs, builds, and deploys on its own. **Do not reintroduce a
+root-level manifest or a combined compose file** — the separation is the point.
 
 `README.md` is the authoritative user/operator documentation (Turkish) — read it before changing
 deployment, env, or link-lifetime behavior.
 
 > **Under version control since 2026-08-10.** Code can be rolled back via git, but **data cannot**:
-> `data-docker/` and `backend/data/` are gitignored — back them up separately before destructive
-> operations. The pre-v2 source tree is archived at `../ipa-ota-download-v1-yedek/`.
+> `backend/data-docker/` and `backend/data/` are gitignored — back them up separately before
+> destructive operations. The pre-v2 source tree is archived at `../ipa-ota-download-v1-yedek/`.
 
 ## Commands
 
+Every command runs **inside a service folder**. There is nothing to run at the repo root.
+
 ```bash
+cd backend
 npm install
+npm run dev            # API on :3000   (reads .env.development + .env.local)
+npm run typecheck
+npm run build          # tsc -> dist/
+npm start              # run the built backend (.env.production + .env.local)
 
-npm run dev:backend    # API on :3000   (reads backend/.env.development + backend/.env.local)
-npm run dev:frontend   # SPA on :5173   (strictPort — fails instead of shifting ports)
-
-npm run typecheck      # both workspaces
-npm run build          # frontend (tsc --noEmit + vite build) then backend (tsc)
-npm start              # run the built backend
+cd frontend
+npm install
+npm run dev            # SPA on :5173   (strictPort — fails instead of shifting ports)
+npm run typecheck
+npm run build          # tsc --noEmit + vite build
 ```
+
+Each service also has `docker:up` / `docker:down` / `docker:logs` wrappers around its own compose
+file. Installing one service never builds the other's dependencies — notably `better-sqlite3`
+(native, needs a compiler) is now backend-only.
 
 ### Tests
 
@@ -39,42 +54,87 @@ node tests/run-suite.mjs A C              # only selected groups
 node tests/run-suite.mjs D --domain https://other.host
 ```
 
+`tests/` stayed at the repo root after the 2026-08-13 split (deliberate choice — it is a
+cross-cutting harness, not a workspace). It has **zero dependencies**: only Node builtins, so no
+`npm install` is needed to run it.
+
 - Groups A (env-var reading), B (docker compose var passthrough), C (API contract) spawn **isolated
   backend instances on free ports with temp data dirs** (`tests/lib/harness.mjs`). The harness
-  spawns `backend/src/index.ts` directly and passes env explicitly — it reads **no** `.env` files.
+  spawns `backend/src/index.ts` with `cwd: backend/` and passes env explicitly — it reads **no**
+  `.env` files, so it resolves `backend/node_modules` and is unaffected by the split.
 - Group B additionally exercises the running `docker compose` stack; bring it up first or those
   cases skip.
-- Group D targets the real deployed HTTPS chain, reading `PUBLIC_BASE_URL` from the root `.env`.
+- Group D targets the real deployed HTTPS chain, reading `PUBLIC_BASE_URL` from an `.env` file.
 - JSON reports land in `tests/reports/`. `tests/TEST-PLAN.md` is the scenario matrix.
 - Test IPAs: `tests/fixtures/*.ipa`, regenerate with `node tests/fixtures/make-ipa.mjs <out.ipa> …`.
 
-Current state (2026-08-10): **A+B+C = 106/106** with the compose stack up, **D = 47/47** against
-the live domain. Suite D was updated 2026-08-10 to v2 expectations — it now asserts the *absence*
-of `/config.js`, a `SameSite=Lax` cookie, and fully disabled CORS in production
-(D2.4/D3.3/D3.5/D3.7). Evidence and history: `tests/BULGULAR-HTTPS.md`.
+> **⚠️ Groups B and D need repair (as of 2026-08-13) — this is known, not a mystery.**
+> They hardcode the now-deleted root `.env` and root `docker-compose.yml`:
+> `suite-b-docker.mjs` calls `readFileSync(join(KOK, '.env'))` (B1, B4), runs bare
+> `docker compose config` from the root (B1, B5), and `run-suite.mjs` reads `PUBLIC_BASE_URL`
+> from the root `.env` for group D. The fix is mechanical: point them at `backend/.env` and
+> `backend/docker-compose.yml`, and note the compose project name is now `ipa-ota-backend`
+> (was `ipa-ota-download`), so `docker compose ps -q api` must run from `backend/`.
+> **A and C are unaffected** — verified by inspection of their imports and spawn path.
+
+Last full green run: **156/156** (2026-08-10 evening; A+B+C = 107, D = 49) against images built
+that day — i.e. **before** the split. Suite D asserts the current posture: no `/config.js` (D2.4),
+cookie `SameSite=None` + CORS open for `http://localhost:5173` only (D3.3/D3.5/D3.7), and the
+Origin guard rejecting foreign-origin writes (D3.8/D3.9). Evidence and history:
+`tests/BULGULAR-HTTPS.md`.
 
 ### Docker
 
+Two separate stacks, two separate compose projects. Neither file knows about the other service.
+
 ```bash
-docker compose up -d --build      # api on :3000, web on :5173 (host)
-docker compose logs -f api
-docker compose stop api && npm run dev:backend   # avoid port 3000 collision
+cd backend  && docker compose up -d --build     # project ipa-ota-backend,  api on :3000
+cd frontend && docker compose up -d --build     # project ipa-ota-frontend, web on :5173
+
+cd backend && docker compose logs -f api
+cd backend && docker compose stop api && npm run dev   # avoid port 3000 collision
 ```
 
-**Port 3000 collision is silent on macOS.** A stray `npm run dev:backend` and the api container can
-both appear to listen (IPv4 vs IPv6), and requests hit whichever wins. If test results look
-impossible, run `lsof -nP -iTCP:3000 -sTCP:LISTEN` first. This is also a **production** concern,
-not just a dev nuisance: the public domain's nginx forwards to this machine's :3000 (see
-Architecture), so a stray dev backend can end up serving live traffic.
+Compose project names are pinned via the top-level `name:` key in each file. Without it compose
+would derive the project from the directory (`backend`, `frontend`). Containers are named
+`ipa-ota-api` and `ipa-ota-web`.
+
+**Port 3000 collision is silent on macOS.** A stray `npm run dev` in `backend/` and the api
+container can both appear to listen (IPv4 vs IPv6), and requests hit whichever wins. If test
+results look impossible, run `lsof -nP -iTCP:3000 -sTCP:LISTEN` first. This is also a
+**production** concern, not just a dev nuisance: the public domain's nginx forwards to this
+machine's :3000 (see Architecture), so a stray dev backend can end up serving live traffic.
+
+> Quickest way to tell *who answered*: `GET /healthz` returns `uptime` **in seconds**. A server you
+> just started reports `0`–`2`; a large value means an already-running container replied, not your
+> process. This bit during the 2026-08-13 split: Docker Desktop started in the background mid-task
+> and `restart: unless-stopped` revived the old containers, making a probe of the "new" backend
+> return the old one's answers.
 
 ## Architecture
 
-### Two independent deployables, no shared code
+### Two independent deployables, no shared anything
 
 `frontend` imports **nothing** from `backend`. The only contract is HTTP, and the DTO types in
 `frontend/src/api.ts` are kept in sync with `backend/src/modules/builds/build.dto.ts` +
 `backend/src/config/settings.schema.ts` **by hand**. Nothing catches the drift for you at compile
 time — test C10 is the guard.
+
+Since 2026-08-13 the separation is structural, not just conventional. Each service owns:
+
+| | backend | frontend |
+|---|---|---|
+| manifest + lockfile | `backend/package.json`, `backend/package-lock.json` | `frontend/package.json`, `frontend/package-lock.json` |
+| `node_modules` | `backend/node_modules` | `frontend/node_modules` |
+| TS config | `backend/tsconfig.json` (self-contained; base was inlined) | `frontend/tsconfig.json` (already was) |
+| compose | `backend/docker-compose.yml`, project `ipa-ota-backend` | `frontend/docker-compose.yml`, project `ipa-ota-frontend` |
+| image build context | `backend/` | `frontend/` |
+| compose env | `backend/.env` | `frontend/.env` |
+| data | `backend/data-docker/` (bind mount) | none — stateless |
+
+Docker build contexts are the service folder, **not the repo root**. `docker build` from the root
+will fail; `cd backend && docker build .` is the shape now. The Dockerfiles do
+`COPY package.json package-lock.json* ./ && npm ci` with no `--workspace` flag.
 
 There is **no proxy in this repo**, not even in dev. Vite has no `server.proxy`, and the web
 container's nginx serves static files only.
@@ -87,9 +147,19 @@ been **removed** — do not reintroduce it.
 
 | | `VITE_API_BASE_URL` | consequence |
 |---|---|---|
-| `frontend/.env.production` | *empty* | relative paths (`/api/...`); same origin; **no CORS**; cookie stays `SameSite=Lax` |
-| `frontend/.env.development` | `https://ipa-ios.simurgbilisim.com` | cross-origin; backend must list `http://localhost:5173` in `CORS_ORIGINS` |
-| `frontend/.env.local` (gitignored) | `http://localhost:3000` | points dev SPA at the local backend so uploads land in `backend/data/` |
+| `frontend/.env.production` | *empty* | relative paths (`/api/...`); the deployed SPA stays same-origin and never needs CORS |
+| `frontend/.env.development` | `https://ipa-ios.simurgbilisim.com` | dev SPA talks to the LIVE API cross-origin (`backend/.env` lists `http://localhost:5173` in `CORS_ORIGINS`) — panel actions hit production data |
+| `frontend/.env.local` (gitignored) | `http://localhost:3000` | points the dev SPA at the local backend instead; uploads land in `backend/data/` |
+
+**`frontend/.env` is NOT in that table on purpose.** It exists, but it belongs to `docker compose`
+(it carries `WEB_PORT`). Vite nonetheless loads `.env` as its base file — order is
+`.env` → `.env.[mode]` → `.env.local` → `.env.[mode].local` — so a `VITE_`-prefixed variable
+written there would silently leak into the bundle. Keep `VITE_*` out of `frontend/.env`.
+
+Dev-SPA-to-live-API caveats: Safari blocks third-party cookies (use Chrome/Firefox), and host
+port 5173 is usually held by the frontend container — `cd frontend && docker compose stop web`
+first (install links keep working while `web` is down, because the backend serves them; only the
+live panel goes 502).
 
 Production therefore requires a reverse proxy in front (**configured by devops, not in this repo**):
 
@@ -103,15 +173,28 @@ through the single `/api/*` rule. Verified: `/api/i/:token` and `/api/builds` co
 conflict.
 
 The proxy's upstream is **this machine**: a LAN nginx (not in this repo, not on this Mac)
-terminates TLS for the domain and forwards to 192.168.20.205:3000/:5173 — the compose stack here
-*is* production. With the stack down, the domain returns **502 with a perfectly valid
-certificate** (measured 2026-08-10). Check liveness via `https://…/healthz`, never via TLS alone.
+terminates TLS for the domain and forwards to 192.168.20.205:3000/:5173 — the compose stacks here
+*are* production. Since the split there are **two** of them, so a 502 now localizes the fault:
+`/` 502 ⇒ frontend down, `/api/*` 502 ⇒ backend down. Either way the certificate stays perfectly
+valid (measured 2026-08-10), so check liveness via `https://…/healthz`, never via TLS alone.
 
-### `CORS_ORIGINS` must be empty in production
+### CORS is deliberately open for `http://localhost:5173` (decision 2026-08-10)
 
-`backend/src/server.ts` registers `@fastify/cors` **only when the list is non-empty**. A non-empty
-list also forces the session cookie to `SameSite=None` (`config/env.ts`), which is a needless
-weakening when the SPA is same-origin. Empty list ⇒ `SameSite=Lax` + `Secure`.
+The user chose to develop the frontend fully separately, talking to the live API over CORS.
+`backend/.env` therefore sets `CORS_ORIGINS=http://localhost:5173`. Note this is **not** a
+dependency on the frontend service: the backend only declares which origins may call it, and has
+no knowledge of where or whether a frontend runs. Consequences, all intentional:
+
+- `backend/src/server.ts` registers `@fastify/cors` only when the list is non-empty (it now is).
+- A non-empty list forces the session cookie to `SameSite=None` (`config/env.ts` 'auto' rule).
+- The lost CSRF protection is replaced by the **Origin validation hook** in `server.ts`:
+  state-changing requests (POST/PUT/PATCH/DELETE) carrying an `Origin` header outside
+  `CORS_ORIGINS ∪ origin(PUBLIC_BASE_URL)` get 403 before auth runs. Clients that send no
+  Origin (curl, tests, installd) are unaffected. Do not remove this hook while CORS is open,
+  and do not add new allowed origins casually — every entry widens the CSRF trust set.
+- Emptying the list rolls everything back to the same-origin posture (cookie returns to
+  `SameSite=Lax`) but breaks the dev-SPA-to-live-API workflow; tests D3.3/D3.5/D3.7 would
+  then fail by design.
 
 ### Backend layout (`backend/src/`)
 
@@ -208,29 +291,43 @@ client gets 401 before sending a gigabyte of body.
   `--experimental-strip-types`, and `tsc` rewrites them to `.js` at build time.
 - **No parameter properties.** `constructor(private x: T)` is unsupported by Node's type-stripping
   mode — declare fields and assign in the constructor body (see any service class).
-- `tsconfig.base.json` sets `strict` plus `noUncheckedIndexedAccess`; indexed access yields
-  `T | undefined`, hence the `!` / `??` patterns around array and record lookups.
+- **Each `tsconfig.json` is self-contained.** `tsconfig.base.json` was deleted in the 2026-08-13
+  split and its contents inlined into `backend/tsconfig.json` (`frontend/tsconfig.json` never
+  extended it). Both set `strict` plus `noUncheckedIndexedAccess`; indexed access yields
+  `T | undefined`, hence the `!` / `??` patterns around array and record lookups. A compiler-option
+  change now has to be made **in both files** — that is the accepted cost of independence.
 
 ## Environment files
 
 There is no `dotenv`. Node's `--env-file-if-exists` is used, and **later files beat earlier ones,
-while a real environment variable beats every file** (verified, not assumed).
+while a real environment variable beats every file** (verified, not assumed — re-confirmed
+2026-08-13 by booting the backend with `PORT=3010`, which overrode `.env.development`'s `3000`).
 
-| workspace | loaded order |
-|---|---|
-| backend dev (`npm run dev:backend`) | `.env.development` → `.env.local` → shell |
-| backend prod (`npm start`, container `CMD`) | `.env.production` → `.env.local` → shell |
-| frontend (Vite) | `.env.development` \| `.env.production` → `.env.local` |
+Each service has **two unrelated families of env files** living in the same folder. Confusing them
+is the main footgun of this layout:
 
+| file | read by | purpose |
+|---|---|---|
+| `backend/.env` | `docker compose` **only** | secrets + host port for the api stack |
+| `backend/.env.development` → `.env.local` | Node (`npm run dev`) | local dev config |
+| `backend/.env.production` → `.env.local` | Node (`npm start`, container `CMD`) | prod defaults, baked into the image |
+| `frontend/.env` | `docker compose` — **and Vite, unavoidably** | `WEB_PORT`; keep `VITE_*` out |
+| `frontend/.env.development` \| `.env.production` → `.env.local` | Vite | `VITE_API_BASE_URL` |
+
+- Node never reads a bare `.env`: the files are named explicitly in each `package.json` via
+  `--env-file-if-exists`. Vite is the exception — it always loads `.env` as its base file.
 - `backend/.env.development` and `backend/.env.production` **are committed and contain no secrets.**
   `.env.production` is copied into the image; docker compose then overrides secrets via
   `environment:`, which wins because it is a real env var.
-- Secrets live only in `backend/.env.local` (dev) and the **root `.env`** (docker compose).
-  Templates: `backend/.env.local.example`, `frontend/.env.local.example`, `.env.example`.
-- **`docker compose` reads only the root `.env`.** `ADMIN_PASSWORD` and `SESSION_SECRET` use the
-  `${VAR:?message}` form, so compose **fails to start** rather than silently running passwordless.
+- Secrets live only in `backend/.env.local` (dev) and **`backend/.env`** (docker compose).
+  Templates: `backend/.env.example`, `frontend/.env.example`, `backend/.env.local.example`,
+  `frontend/.env.local.example`. All `.env` / `.env.local` files are gitignored (the patterns are
+  slash-free, so they match at any depth).
+- **`docker compose` reads the `.env` in its own directory**, so `backend/.env` and `frontend/.env`
+  cannot see each other. `ADMIN_PASSWORD` and `SESSION_SECRET` use the `${VAR:?message}` form, so
+  the backend stack **fails to start** rather than silently running passwordless.
 - `NODE_ENV`, `PORT`, `DATA_DIR` are deliberately **not** in compose's `environment:` block — their
-  only source is the image's `.env.production`, so a stray value in the root `.env` cannot reach
+  only source is the image's `.env.production`, so a stray value in `backend/.env` cannot reach
   the container.
 - **`ADMIN_PASSWORD` is read only on first boot** (so a password changed in the panel survives
   restarts). To reset: start once with `ADMIN_PASSWORD_FORCE_RESET=true`, or delete the DB.
@@ -239,11 +336,12 @@ while a real environment variable beats every file** (verified, not assumed).
 
 ## Data lives in a bind mount, not a named volume
 
-`docker-compose.yml` maps `./data-docker:/data` **on purpose**: a named volume lives inside Docker
-Desktop's Linux VM and cannot be opened from macOS. With the bind mount:
+`backend/docker-compose.yml` maps `./data-docker:/data` **on purpose**: a named volume lives inside
+Docker Desktop's Linux VM and cannot be opened from macOS. The directory moved from the repo root
+to `backend/data-docker/` in the 2026-08-13 split (35 MB, backed up first). With the bind mount:
 
 ```bash
-sqlite3 data-docker/ipa-ota.db "select app_name, version, expires_at from builds;"   # ONLY while api is stopped
+sqlite3 backend/data-docker/ipa-ota.db "select app_name, version, expires_at from builds;"   # ONLY while api is stopped
 sqlite3 backend/data/ipa-ota.db "..."        # local dev
 ```
 
@@ -259,11 +357,55 @@ sqlite3 backend/data/ipa-ota.db "..."        # local dev
 >   console.log(db.prepare("select app_name, version from builds").all());'
 > ```
 >
-> Host `sqlite3` is safe only after `docker compose stop api`.
+> Host `sqlite3` is safe only after `cd backend && docker compose stop api`.
 
 SQLite runs in **WAL mode**. If you copy the database elsewhere, copy `ipa-ota.db-wal` and
 `ipa-ota.db-shm` too — the `.db` file alone is missing the most recent writes. **Back up
-`./data-docker/`.**
+`backend/data-docker/`.**
+
+### The bind mount breaks SQLite locking — measured, not inferred (2026-08-13)
+
+The 2026-08-10 loss was blamed on *host* `sqlite3`. It is worse than that: the failure is the bind
+mount itself, and it hits **any** second writer, including another container.
+
+| setup | second writer's fate | lock holder's fate |
+|---|---|---|
+| bind mount, two containers | wrote **straight through** a `BEGIN IMMEDIATE` lock | died on `COMMIT` — `locking protocol`, errcode 15; **its transaction was lost** |
+| bind mount, two processes in **one** container | identical | identical |
+| bind mount, reader only | saw all 200 uncheckpointed WAL rows | untouched; reader's close destroyed nothing |
+| **named volume**, two containers | correctly blocked: `database is locked` | committed cleanly, no loss |
+
+There is no Docker setting to fix this: VirtioFS is already enabled
+(`useVirtualizationFrameworkVirtioFS: true`, macOS 12.7.4) and the mount still reports as
+`fakeowner` over `/run/host_mark`. The named-volume row is the only known cure.
+
+Consequences: **reads from a second process are safe; a second writer is not.** Any future tool
+that touches this database concurrently must be read-only, or the DB must move to a named volume
+first.
+
+### `dbadmin` — read-only SQLite browser (off by default)
+
+`backend/docker-compose.yml` carries a `dbadmin` service (`coleifer/sqlite-web`, amd64-only so it
+emulates on this arm64 Mac) behind the compose profile `dbadmin`, so a plain `docker compose up -d`
+never starts it. `cd backend && npm run db:ui` → `http://127.0.0.1:8081`.
+
+Three load-bearing details, each verified:
+
+- **`-r` is the safety boundary, not a preference.** With it, the SQL console returns *attempt to
+  write a readonly database* and the `delete-row` / `drop-table` routes are not registered at all
+  (404). Removing the flag re-opens the data-loss path in the table above.
+- **The volume is deliberately not `:ro`.** In WAL mode even a *reader* must write the `-shm`
+  wal-index, so a read-only mount cannot open the database. The read limit comes from `-r`.
+- **It binds to `127.0.0.1` by default** (`DBADMIN_BIND`). This Mac is the production host;
+  `0.0.0.0` would expose the whole database to the LAN behind nothing but `DBADMIN_PASSWORD`.
+  Prefer `ssh -L 8081:127.0.0.1:8081`.
+
+> **Moving the data directory while a container runs is a trap.** Docker resolves a bind mount to
+> an inode at container start, so a same-filesystem `mv` is silently followed by the running
+> container — it keeps writing to the new location and nothing looks wrong. But on the next
+> restart compose re-resolves the *path*, finds it missing, and **creates an empty directory**,
+> booting the service against a blank database. Stop the stack before moving data, and after any
+> such move verify the mount with `docker compose config | grep source:`.
 
 ## HTTPS is a functional requirement, not a hardening step
 
