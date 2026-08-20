@@ -197,7 +197,11 @@ export class BuildService {
   clampTtl(ttlHours: number | undefined): number {
     const { defaultTtlHours, maxTtlHours } = this.config.get();
     if (ttlHours === undefined || !Number.isFinite(ttlHours)) return defaultTtlHours;
-    return Math.min(Math.max(Math.round(ttlHours), 1), maxTtlHours);
+    const saat = Math.round(ttlHours);
+    // 1'in alti "sure verilmedi" sayilir: bos birakilan form alani 0 olarak
+    // gelir; onu sessizce 1 saate cevirmek kullaniciyi yaniltiyordu (2026-08-20).
+    if (saat < 1) return defaultTtlHours;
+    return Math.min(saat, maxTtlHours);
   }
 
   /** Kaydi ve dosyalarini tamamen siler. */
@@ -213,6 +217,13 @@ export class BuildService {
 
   /** Linki yeniden acar (suresi hala doluysa yine aktif olmaz). */
   unrevoke(id: string): BuildRecord | null {
+    const mevcut = this.builds.findById(id);
+    if (!mevcut) return null;
+    // Dosyalari silinmis kaydi "yeniden acmak" bos vaat olur: link 410 doner
+    // ama panelde aktif gorunurdu. extend() ile ayni kural (2026-08-20).
+    if (mevcut.filesDeletedAt !== null) {
+      throw new UploadError('Bu surumun dosyalari silinmis; link yeniden acilamaz.', 409);
+    }
     return this.builds.update(id, { revokedAt: null });
   }
 

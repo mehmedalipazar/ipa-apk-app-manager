@@ -1,0 +1,349 @@
+{
+  "tarih": "2026-08-20T08:24:56.266Z",
+  "taban": "http://localhost:3000",
+  "sonuclar": [
+    {
+      "grup": "D1 — TLS ve altyapi",
+      "id": "D1.1",
+      "baslik": "Sertifika gecerli ve hostname esliyor",
+      "gecti": true,
+      "detay": "CN=ipa-ios.simurgbilisim.com"
+    },
+    {
+      "grup": "D1 — TLS ve altyapi",
+      "id": "D1.2",
+      "baslik": "Sertifikanin suresi dolmamis",
+      "gecti": true,
+      "detay": "75 gun kaldi"
+    },
+    {
+      "grup": "D1 — TLS ve altyapi",
+      "id": "D1.3",
+      "baslik": "Adres https ve iOS kurulumu icin uygun",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D2 — Ters proxy rota haritasi",
+      "id": "D2.1",
+      "baslik": "/api/* API container`ina gidiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D2 — Ters proxy rota haritasi",
+      "id": "D2.2",
+      "baslik": "/ admin arayuzunu (SPA) donduruyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D2 — Ters proxy rota haritasi",
+      "id": "D2.3",
+      "baslik": "Kurulum oneki API`ye gidiyor, SPA`ya dusmuyor",
+      "gecti": true,
+      "detay": "onek=/api/i"
+    },
+    {
+      "grup": "D2 — Ters proxy rota haritasi",
+      "id": "D2.4",
+      "baslik": "Kaldirilan /config.js mekanizmasi geri donmemis",
+      "gecti": true,
+      "detay": "/config.js -> 200, yapilandirma yok"
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.1",
+      "baslik": "Giris oncesi oturum yok",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.2",
+      "baslik": "Yanlis sifre reddediliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.3",
+      "baslik": "Dogru sifre ile giris + cerez bayraklari",
+      "gecti": true,
+      "detay": "Max-Age=43200; Path=/; HttpOnly; Secure; SameSite=None"
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.4",
+      "baslik": "Cerez ile korumali uca erisim",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.5",
+      "baslik": "CORS: yerel gelistirme arayuzune izin veriliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.6",
+      "baslik": "CORS: izinsiz origin reddediliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.7",
+      "baslik": "CORS preflight izinli origin icin calisiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.8",
+      "baslik": "Origin korumasi: yabanci origin yazma istegi 403",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D3 — Kimlik dogrulama ve cerez",
+      "id": "D3.9",
+      "baslik": "Origin korumasi: izinli origin'ler geciriliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D4 — Ayarlar",
+      "id": "D4.1",
+      "baslik": "Base URL domain olarak okunuyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D4 — Ayarlar",
+      "id": "D4.2",
+      "baslik": "https uyarisi yok (iOS kurulumu engelli degil)",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D5 — IPA yukleme",
+      "id": "D5.1",
+      "baslik": "IPA yuklendi ve ayristirildi",
+      "gecti": true,
+      "detay": "DemoA 1.0.0 (com.ankageo.demoa) 61.5 KB"
+    },
+    {
+      "grup": "D5 — IPA yukleme",
+      "id": "D5.2",
+      "baslik": "Yuklemede yapilandirma uyarisi yok",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D5 — IPA yukleme",
+      "id": "D5.3",
+      "baslik": "Kurulum linki domain + dogru onek ile uretildi",
+      "gecti": true,
+      "detay": "https://ipa-ios.simurgbilisim.com/api/i/juWtTwQ7Gb5pMSUDuZQnLZ"
+    },
+    {
+      "grup": "D5 — IPA yukleme",
+      "id": "D5.4",
+      "baslik": "Yuklenen dosyanin SHA-256`i kaydedilmis",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D6 — Kurulum sayfasi (son kullanici)",
+      "id": "D6.1",
+      "baslik": "Kurulum sayfasi acilyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D6 — Kurulum sayfasi (son kullanici)",
+      "id": "D6.2",
+      "baslik": "iPhone UA ile itms-services kurulum dugmesi geliyor",
+      "gecti": true,
+      "detay": "itms-services://?action=download-manifest&url=https%3A%2F%2Fipa-ios.simurgbilisi..."
+    },
+    {
+      "grup": "D6 — Kurulum sayfasi (son kullanici)",
+      "id": "D6.3",
+      "baslik": "itms-services adresi https manifest`ine isaret ediyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D6 — Kurulum sayfasi (son kullanici)",
+      "id": "D6.4",
+      "baslik": "QR kodu uretiliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D6 — Kurulum sayfasi (son kullanici)",
+      "id": "D6.5",
+      "baslik": "Sayfa gosterimi sayilıyor",
+      "gecti": true,
+      "detay": "viewCount=2"
+    },
+    {
+      "grup": "D7 — manifest.plist (iOS installd)",
+      "id": "D7.1",
+      "baslik": "Imzasiz manifest reddediliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D7 — manifest.plist (iOS installd)",
+      "id": "D7.2",
+      "baslik": "Bozuk imza reddediliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D7 — manifest.plist (iOS installd)",
+      "id": "D7.3",
+      "baslik": "Imzali manifest XML olarak geliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D7 — manifest.plist (iOS installd)",
+      "id": "D7.4",
+      "baslik": "Manifest icindeki alanlar dogru",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D7 — manifest.plist (iOS installd)",
+      "id": "D7.5",
+      "baslik": "Manifest`teki .ipa adresi https ve dogru domain",
+      "gecti": true,
+      "detay": "https://ipa-ios.simurgbilisim.com/api/i/juWtTwQ7Gb5pMSUDuZQnLZ/app.ipa?k=1787221495997.uG1..."
+    },
+    {
+      "grup": "D8 — .ipa indirme",
+      "id": "D8.1",
+      "baslik": "Imzasiz indirme reddediliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D8 — .ipa indirme",
+      "id": "D8.2",
+      "baslik": "Imzali indirme calisiyor ve dosya birebir ayni",
+      "gecti": true,
+      "detay": "63026 bayt, hash esit"
+    },
+    {
+      "grup": "D8 — .ipa indirme",
+      "id": "D8.3",
+      "baslik": "Range istegi (kismi indirme) destekleniyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D8 — .ipa indirme",
+      "id": "D8.4",
+      "baslik": "Sondan Range (bytes=-N) destekleniyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D8 — .ipa indirme",
+      "id": "D8.5",
+      "baslik": "Indirme sayaci artiyor",
+      "gecti": true,
+      "detay": "indirme=3 kurulum=1"
+    },
+    {
+      "grup": "D9 — Imza guvenligi",
+      "id": "D9.1",
+      "baslik": "Manifest anahtari .ipa icin kullanilamiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D9 — Imza guvenligi",
+      "id": "D9.2",
+      "baslik": "Bir surumun anahtari baska surumde gecmiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D9 — Imza guvenligi",
+      "id": "D9.3",
+      "baslik": "Olmayan token 404",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D9 — Imza guvenligi",
+      "id": "D9.4",
+      "baslik": "Iptal edilen surum 410 donuyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D9 — Imza guvenligi",
+      "id": "D9.5",
+      "baslik": "Iptal geri alinabiliyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D10 — Sifre korumali dagitim",
+      "id": "D10.1",
+      "baslik": "Sifreli surum yuklendi",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D10 — Sifre korumali dagitim",
+      "id": "D10.2",
+      "baslik": "Sifresiz erisimde kurulum dugmesi verilmiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D10 — Sifre korumali dagitim",
+      "id": "D10.3",
+      "baslik": "Yanlis sifre kurulum linki vermiyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D10 — Sifre korumali dagitim",
+      "id": "D10.4",
+      "baslik": "Dogru sifre kurulum linkini aciyor",
+      "gecti": true,
+      "detay": ""
+    },
+    {
+      "grup": "D11 — Tam iOS kurulum simulasyonu",
+      "id": "D11.1",
+      "baslik": "iPhone akisi: sayfa -> manifest -> ipa",
+      "gecti": true,
+      "detay": "63026 bayt, zincir tamamen https"
+    },
+    {
+      "grup": "D12 — Temizlik",
+      "id": "D12.1",
+      "baslik": "Test surumleri silindi",
+      "gecti": true,
+      "detay": "3 surum silindi"
+    },
+    {
+      "grup": "D12 — Temizlik",
+      "id": "D12.2",
+      "baslik": "Cikis yapiliyor ve cerez dusuyor",
+      "gecti": true,
+      "detay": ""
+    }
+  ]
+}

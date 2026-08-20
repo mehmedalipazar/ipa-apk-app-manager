@@ -19,8 +19,11 @@ export class LocalStorage implements Storage {
   /** Anahtari kok dizin icine hapseder — ".." ile disari cikilamaz. */
   private resolve(key: string): string {
     const temiz = normalize(key).replace(/^([./\\])+/, '');
+    // Bos anahtar kok dizinin kendisine cozulurdu; removePrefix('') gibi bir
+    // cagri TUM yuklemeleri silerdi. Acikca reddet (2026-08-20).
+    if (!temiz) throw new Error(`Gecersiz depolama anahtari: ${JSON.stringify(key)}`);
     const tam = join(this.root, temiz);
-    if (!tam.startsWith(this.root + sep) && tam !== this.root) {
+    if (!tam.startsWith(this.root + sep)) {
       throw new Error(`Gecersiz depolama anahtari: ${key}`);
     }
     return tam;

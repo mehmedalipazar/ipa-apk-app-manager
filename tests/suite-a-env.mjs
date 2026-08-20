@@ -447,4 +447,19 @@ export async function calistir() {
       rmSync(dizin, { recursive: true, force: true });
     }
   });
+
+  await test('A-baseurl-bicim', 'Gecersiz PUBLIC_BASE_URL aciliste reddediliyor (sessizce bosa dusmuyor)', async () => {
+    // Sema olmadan verilen adres ("alan.adi" gibi) eskiden ayar yuklenirken
+    // sessizce ATILIYOR ve uyari "PUBLIC_BASE_URL ayarlayin" diyordu — deger
+    // ayarli ama gecersizken yanlis teshis. Artik acilista acikca durmali.
+    const s = await sunucuBaslat({ ADMIN_PASSWORD: 'TestSifresi-1453!', PUBLIC_BASE_URL: 'ipa-ios.ornek.local' });
+    try {
+      bekle(!s.hazir, 'sunucu gecersiz PUBLIC_BASE_URL ile ayaga kalkmamaliydi');
+      bekle(/PUBLIC_BASE_URL/.test(s.cikti), `hata mesaji degiskeni soylemiyor:\n${s.cikti.slice(-300)}`);
+    } finally {
+      await s.durdur();
+      s.temizle();
+    }
+    return { detay: 'acilis hatasi + mesajda degisken adi' };
+  });
 }

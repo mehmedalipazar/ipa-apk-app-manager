@@ -7,7 +7,7 @@
  *   node tests/run-suite.mjs --taban http://localhost:5173   # baska bir ornegi hedefle
  *
  * Grup D digerlerinden ayridir: izole sunucu baslatmaz, yayindaki HTTPS
- * adresini hedefler. Adresi `.env`deki PUBLIC_BASE_URL'den okur; `--domain`
+ * adresini hedefler. Adresi `backend/.env`deki PUBLIC_BASE_URL'den okur; `--domain`
  * ile ezilebilir.
  *
  *   node tests/run-suite.mjs D

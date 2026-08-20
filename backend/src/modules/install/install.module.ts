@@ -78,7 +78,8 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       }
     }
 
-    ctx.builds.increment(build.id, 'view_count');
+    // Yanlis sifre denemesi "goruntuleme" sayilmaz — sayac gercek erisimi olcer.
+    if (sifreHatasi === null) ctx.builds.increment(build.id, 'view_count');
 
     let pageUrl: string;
     let installUrl: string | null = null;
@@ -90,10 +91,12 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       if (build.iconPath) iconUrl = ctx.links.iconUrl(build.token);
     } catch (e) {
       if (e instanceof ConfigError) {
+        // "Link bulunamadi" DEGIL: sorun kullanicinin adresi degil, sunucu
+        // yapilandirmasi. Yanlis teshis gosterme (2026-08-20).
         await reply
           .code(503)
           .type('text/html; charset=utf-8')
-          .send(renderUnavailablePage(ayarlar.siteName, 'notfound'));
+          .send(renderUnavailablePage(ayarlar.siteName, 'yapilandirma'));
         request.log.error({ err: e }, 'Base URL ayarlanmamis — kurulum sayfasi uretilemedi.');
         return;
       }
@@ -184,15 +187,30 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       const toplam = await ctx.storage.size(key);
       if (toplam === null) return reply.code(410).send({ error: 'Dosya sunucudan kaldirilmis.' });
 
-      const dosyaAdi = `${build.appName.replace(/[^\w.-]+/g, '_')}-${build.version}.ipa`;
+      // Ad VE surum birlikte temizlenir: surumden gelebilecek tirnak/bosluk
+      // Content-Disposition basligini bozmasin (2026-08-20).
+      const dosyaAdi = `${`${build.appName}-${build.version}`.replace(/[^\w.-]+/g, '_')}.ipa`;
 
       // Kismi indirme (Range) destegi — buyuk dosyalarda kopan indirmeler
       // bastan baslamasin diye.
       const range = parseRange(request.headers.range, toplam);
+      if (range === 'karsilanamaz') {
+        // RFC 9110 14.4: dosya disinda baslayan aralik 416 + bytes */size.
+        return reply
+          .code(416)
+          .header('content-range', `bytes */${toplam}`)
+          .send({ error: 'Istenen aralik dosya boyutunun disinda.' });
+      }
+
+      // Sayac "indirme"yi olcer: dosyanin BASINDAN baslayan govdeli istekler.
+      // iOS installd buyuk dosyayi Range parcalariyla ceker; her parcayi ayri
+      // indirme saymak sayaci anlamsizca sisiriyordu. HEAD hic sayilmaz (2026-08-20).
+      const indirmeSayilir = request.method !== 'HEAD' && (range === null || range.start === 0);
+
       if (range) {
         const stream = await ctx.storage.createReadStream(key, range);
         if (!stream) return reply.code(410).send({ error: 'Dosya bulunamadi.' });
-        ctx.builds.increment(build.id, 'download_count');
+        if (indirmeSayilir) ctx.builds.increment(build.id, 'download_count');
         return reply
           .code(206)
           .type('application/octet-stream')
@@ -206,7 +224,7 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       const stream = await ctx.storage.createReadStream(key);
       if (!stream) return reply.code(410).send({ error: 'Dosya bulunamadi.' });
 
-      ctx.builds.increment(build.id, 'download_count');
+      if (indirmeSayilir) ctx.builds.increment(build.id, 'download_count');
       return reply
         .type('application/octet-stream')
         .header('content-length', String(toplam))
@@ -258,33 +276,42 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
   });
 }
 
-/** `Range: bytes=0-1023` basligini cozer. Gecersizse null. */
+/**
+ * `Range: bytes=0-1023` basligini RFC 9110'a gore cozer.
+ *
+ *   null            -> baslik yok ya da bicimi bozuk: baslik YOK SAYILIR, tam govde (200).
+ *   'karsilanamaz'  -> aralik dosyanin disinda: 416 + `Content-Range: bytes *\/size`.
+ *   {start, end}    -> gecerli aralik; son bayti asan istek size-1'e KIRPILIR
+ *                      (eskiden 200 tam govdeye dusuluyordu — 2026-08-20).
+ */
 function parseRange(
   header: string | undefined,
   size: number,
-): { start: number; end: number } | null {
+): { start: number; end: number } | 'karsilanamaz' | null {
   if (!header) return null;
   const eslesme = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
   if (!eslesme) return null;
 
   const [, startStr, endStr] = eslesme;
-  let start: number;
-  let end: number;
 
   if (startStr) {
-    start = Number(startStr);
-    end = endStr ? Number(endStr) : size - 1;
-  } else if (endStr) {
-    // "bytes=-500" => son 500 bayt
-    start = Math.max(0, size - Number(endStr));
-    end = size - 1;
-  } else {
-    return null;
+    const start = Number(startStr);
+    if (!Number.isFinite(start)) return null;
+    if (start >= size) return 'karsilanamaz';
+    const end = endStr ? Math.min(Number(endStr), size - 1) : size - 1;
+    if (!Number.isFinite(end) || start > end) return null; // sozdizimsel sacmalik: yok say
+    return { start, end };
   }
 
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-  if (start < 0 || end >= size || start > end) return null;
-  return { start, end };
+  if (endStr) {
+    // "bytes=-500" => son 500 bayt. "-0" karsilanamaz; dosyadan buyuk N tum dosyadir.
+    const n = Number(endStr);
+    if (!Number.isFinite(n)) return null;
+    if (n === 0) return 'karsilanamaz';
+    return { start: Math.max(0, size - n), end: size - 1 };
+  }
+
+  return null;
 }
 
 export const installModule: AppModule = {

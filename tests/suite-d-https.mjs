@@ -29,9 +29,9 @@ const IOS_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 ' +
   '(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
-/** `.env` dosyasindan tek bir anahtari okur (compose ile ayni kaynak). */
+/** `backend/.env` dosyasindan tek bir anahtari okur (compose ile ayni kaynak). */
 function envOku(anahtar) {
-  const metin = readFileSync(join(KOK, '.env'), 'utf8');
+  const metin = readFileSync(join(KOK, 'backend/.env'), 'utf8');
   const satir = metin.split('\n').find((s) => s.startsWith(`${anahtar}=`));
   return satir ? satir.slice(anahtar.length + 1).trim() : '';
 }
@@ -138,7 +138,7 @@ export async function calistir({ domain } = {}) {
   });
 
   await test('D3.3', 'Dogru sifre ile giris + cerez bayraklari', async () => {
-    bekle(SIFRE.length > 0, '.env icinde ADMIN_PASSWORD yok');
+    bekle(SIFRE.length > 0, 'backend/.env icinde ADMIN_PASSWORD yok');
     const r = await admin.post('/api/auth/login', { password: SIFRE });
     esit(r.status, 200, 'status');
 
@@ -162,7 +162,7 @@ export async function calistir({ domain } = {}) {
   });
 
   await test('D3.5', 'CORS: yerel gelistirme arayuzune izin veriliyor', async () => {
-    // 2026-08-10 karari: kok .env CORS_ORIGINS=http://localhost:5173 tasir,
+    // 2026-08-10 karari: backend/.env CORS_ORIGINS=http://localhost:5173 tasir,
     // boylece dev arayuzu canli API'ye baglanabilir. Basliklarin gelmemesi
     // listenin bosaldigini (dev akisinin koptugunu) gosterir.
     const r = await fetch(`${TABAN}/api/auth/me`, {
@@ -384,8 +384,12 @@ export async function calistir({ domain } = {}) {
   });
 
   await test('D8.5', 'Indirme sayaci artiyor', async () => {
+    // 2026-08-20 duzeltmesi: Range parcalari ve HEAD ayri indirme sayilmaz;
+    // yalnizca bastan baslayan govdeli indirmeler sayilir. Bu akista D8.2 (tam)
+    // + D8.3 (bytes=0-1023) = 2 beklenir; eski imaj 3+ verir. Esik ikisiyle
+    // de uyumlu.
     const r = await admin.get(`/api/builds/${durum.build.id}`);
-    bekle(r.govde.downloadCount >= 3, `downloadCount=${r.govde.downloadCount}`);
+    bekle(r.govde.downloadCount >= 2, `downloadCount=${r.govde.downloadCount}`);
     bekle(r.govde.installCount >= 1, `installCount=${r.govde.installCount}`);
     return { detay: `indirme=${r.govde.downloadCount} kurulum=${r.govde.installCount}` };
   });

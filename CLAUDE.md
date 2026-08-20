@@ -55,8 +55,11 @@ node tests/run-suite.mjs D --domain https://other.host
 ```
 
 `tests/` stayed at the repo root after the 2026-08-13 split (deliberate choice — it is a
-cross-cutting harness, not a workspace). It has **zero dependencies**: only Node builtins, so no
-`npm install` is needed to run it.
+cross-cutting harness, not a workspace). It needs no `npm install` of its own: almost everything is
+Node builtins. The one exception is two suite-C cases (F13/F14) that open the test instance's
+SQLite directly — they resolve `better-sqlite3` out of `backend/node_modules` via
+`createRequire(backend/package.json)`, so the backend must be installed (it must be anyway to spawn
+the server under test).
 
 - Groups A (env-var reading), B (docker compose var passthrough), C (API contract) spawn **isolated
   backend instances on free ports with temp data dirs** (`tests/lib/harness.mjs`). The harness
@@ -64,24 +67,57 @@ cross-cutting harness, not a workspace). It has **zero dependencies**: only Node
   `.env` files, so it resolves `backend/node_modules` and is unaffected by the split.
 - Group B additionally exercises the running `docker compose` stack; bring it up first or those
   cases skip.
-- Group D targets the real deployed HTTPS chain, reading `PUBLIC_BASE_URL` from an `.env` file.
+- Group D targets the real deployed HTTPS chain. `suite-d-https.mjs` reads `PUBLIC_BASE_URL`,
+  `INSTALL_PATH_PREFIX` and `ADMIN_PASSWORD` from **`backend/.env`** (the compose secrets file) —
+  it logs into the live panel and uploads/removes throwaway builds, so treat a D run as touching
+  production.
 - JSON reports land in `tests/reports/`. `tests/TEST-PLAN.md` is the scenario matrix.
 - Test IPAs: `tests/fixtures/*.ipa`, regenerate with `node tests/fixtures/make-ipa.mjs <out.ipa> …`.
 
-> **⚠️ Groups B and D need repair (as of 2026-08-13) — this is known, not a mystery.**
-> They hardcode the now-deleted root `.env` and root `docker-compose.yml`:
-> `suite-b-docker.mjs` calls `readFileSync(join(KOK, '.env'))` (B1, B4), runs bare
-> `docker compose config` from the root (B1, B5), and `run-suite.mjs` reads `PUBLIC_BASE_URL`
-> from the root `.env` for group D. The fix is mechanical: point them at `backend/.env` and
-> `backend/docker-compose.yml`, and note the compose project name is now `ipa-ota-backend`
-> (was `ipa-ota-download`), so `docker compose ps -q api` must run from `backend/`.
-> **A and C are unaffected** — verified by inspection of their imports and spawn path.
+> **Post-split breakage was repaired 2026-08-20.** After the 2026-08-13 split, B and D read the
+> deleted root `.env`/`docker-compose.yml`, and — contrary to what this file used to claim
+> ("A and C are unaffected, verified by inspection") — **C was also broken in 4 places**
+> (C3b read the root `.env`, F13/F14 imported `better-sqlite3` from the deleted root
+> `node_modules`, F20 uploaded the deleted root `package.json` as its wrong-extension fixture).
+> The inspection-only verification missed what a run caught in seconds: **claims about tests must
+> come from running them.** All suites now use `backend/.env`, `backend/docker-compose.yml`
+> (project `ipa-ota-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
+> service.
 
-Last full green run: **156/156** (2026-08-10 evening; A+B+C = 107, D = 49) against images built
-that day — i.e. **before** the split. Suite D asserts the current posture: no `/config.js` (D2.4),
-cookie `SameSite=None` + CORS open for `http://localhost:5173` only (D3.3/D3.5/D3.7), and the
-Origin guard rejecting foreign-origin writes (D3.8/D3.9). Evidence and history:
+Last full green run: **165/165** (2026-08-20; A+C = 102, B = 14, D = 49) — A+B+C against the fixed
+sources, D against the live stack (still running the 2026-08-13 image, whose behavior the updated
+assertions also accept). Suite D asserts the current posture: no `/config.js` (D2.4), cookie
+`SameSite=None` + CORS open for `http://localhost:5173` only (D3.3/D3.5/D3.7), and the Origin
+guard rejecting foreign-origin writes (D3.8/D3.9). Group H in suite C (H1–H8) plus
+`A-baseurl-bicim` pin the 2026-08-20 bug fixes listed below. Evidence and history:
 `tests/BULGULAR-HTTPS.md`.
+
+#### Behavior fixes shipped 2026-08-20 (pinned by suite C group H + `A-baseurl-bicim`)
+
+- **iPad install works.** iPadOS 13+ desktop-mode UA is indistinguishable from macOS on the
+  server; the non-iOS install page now carries a hidden install block plus a touch-detection
+  script (`Macintosh` + `maxTouchPoints > 1`) that reveals it on iPads. Without JS the page
+  stays in the old QR view.
+- **Sessions die on password change** — see the env section above.
+- **`/api/auth/login` is rate-limited** in-memory: 5 failures per IP → 429 for 15 minutes
+  (reset on success or process restart). Suite D's deliberate failures stay under the limit.
+- **`download_count` counts real downloads**: only body-bearing requests starting at byte 0.
+  Range continuation parts and HEAD no longer inflate it (D8.5's threshold moved 3→2).
+- **Range handling follows RFC 9110**: an end past EOF is clamped into a 206 (was: silently a
+  200 full body); a start past EOF returns 416 + `Content-Range: bytes */size`.
+- **`ttlHours < 1` on upload means "not provided"** → default TTL (was: silently a 1-hour
+  link, because an emptied form field serializes as 0); the upload form also disables submit
+  on an invalid value.
+- **Invalid `PUBLIC_BASE_URL` (missing scheme) fails at boot** instead of being silently
+  dropped by the settings loader with a misleading "not set" warning.
+- **Un-revoking a purged build returns 409** (mirrors `extend`), and `stats.active`,
+  `stats.activeBytes` and the `onlyActive` listing all use the exact `getStatus()` definition
+  of active (not expired AND not revoked AND files present).
+- **Failed password attempts** on the install page no longer increment `view_count`, and the
+  server-config-missing case renders its own 503 page instead of "link not found".
+- **Hardening:** empty storage keys are rejected (`removePrefix('')` would have deleted the
+  whole uploads root); a zip entry exceeding its declared size now fails parsing instead of
+  hanging the request; the `Content-Disposition` filename sanitizes the version string too.
 
 ### Docker
 
@@ -333,6 +369,9 @@ is the main footgun of this layout:
   restarts). To reset: start once with `ADMIN_PASSWORD_FORCE_RESET=true`, or delete the DB.
 - **Changing `SESSION_SECRET` invalidates every session and every outstanding signed link** — it
   keys both the session cookie and the URL HMAC.
+- **Changing the admin password invalidates every session too** (2026-08-20): the session cookie is
+  signed with `SESSION_SECRET + password hash`, so a stolen cookie dies with a password change.
+  Signed install links are NOT affected — they use the raw `SESSION_SECRET`.
 
 ## Data lives in a bind mount, not a named volume
 

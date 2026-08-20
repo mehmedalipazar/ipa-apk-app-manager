@@ -4,6 +4,10 @@
  * Salt-okunur testler mevcut yigina karsi calisir (`docker compose config`,
  * `docker exec`). Yeniden baslatma gerektiren testler `ipa-ota-vartest` adli
  * IZOLE bir projede, mevcut imaji yeniden kullanarak calisir; sonunda temizlenir.
+ *
+ * 2026-08-13 ayrimindan beri IKI compose projesi var: backend/ (api + dbadmin)
+ * ve frontend/ (web). Komutlar ilgili servis dizininden calistirilir; kok
+ * dizinde compose dosyasi YOKTUR.
  */
 import { execFileSync, execSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
@@ -14,8 +18,9 @@ import { grup, test, bekle, esit, uyu, KOK } from './lib/harness.mjs';
 const TEST_PROJE = 'ipa-ota-vartest';
 const IMAJ = 'ipa-ota-api:latest';
 
+// Varsayilan calisma dizini backend/ — compose dosyasi ve .env orada.
 function kabuk(komut, secenekler = {}) {
-  return execSync(komut, { cwd: KOK, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...secenekler });
+  return execSync(komut, { cwd: join(KOK, 'backend'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...secenekler });
 }
 
 function kabukTolere(komut, secenekler = {}) {
@@ -39,7 +44,10 @@ function dockerVar() {
 function composeConfig(envIcerik, ekArg = '') {
   const dizin = mkdtempSync(join(tmpdir(), 'compose-env-'));
   const dosya = join(dizin, '.env');
-  writeFileSync(dosya, envIcerik);
+  // DBADMIN_PASSWORD her zaman eklenir: compose, degisken interpolasyonunu
+  // profil suzgecinden ONCE yapar; dbadmin'in ${DBADMIN_PASSWORD:?} kosulu
+  // profil kapali olsa bile tetiklenebilir. Testin konusu o degil.
+  writeFileSync(dosya, `DBADMIN_PASSWORD=vartest\n${envIcerik}`);
   try {
     // 2>&1: compose "variable is not set" uyarilarini stderr e yazar.
     return kabukTolere(`docker compose --env-file "${dosya}" -f docker-compose.yml config ${ekArg} 2>&1`);
@@ -67,7 +75,7 @@ export async function calistir() {
     const { cikti, kod } = kabukTolere('docker compose config');
     esit(kod, 0, 'compose config');
     bekle(!/\$\{[A-Z_]+\}/.test(cikti), 'Cozulmemis ${VAR} kalmis');
-    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
+    const envMetin = readFileSync(join(KOK, 'backend/.env'), 'utf8');
     const beklenenUrl = /^PUBLIC_BASE_URL=(.*)$/m.exec(envMetin)?.[1]?.trim();
     bekle(cikti.includes(beklenenUrl), `PUBLIC_BASE_URL (${beklenenUrl}) compose ciktisinda yok`);
     return { detay: `PUBLIC_BASE_URL=${beklenenUrl} yerine gecmis` };
@@ -104,8 +112,8 @@ export async function calistir() {
     if (!uygulamaKapsayici) return { skip: true, detay: 'api container calismiyor' };
     const cikti = kabuk(`docker exec ${uygulamaKapsayici} env`);
     const oku = (k) => new RegExp(`^${k}=(.*)$`, 'm').exec(cikti)?.[1];
-    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
-    const hostOku = (k) => /^\s*$/.test('') && new RegExp(`^${k}=(.*)$`, 'm').exec(envMetin)?.[1]?.trim();
+    const envMetin = readFileSync(join(KOK, 'backend/.env'), 'utf8');
+    const hostOku = (k) => new RegExp(`^${k}=(.*)$`, 'm').exec(envMetin)?.[1]?.trim();
 
     const sapan = [];
     for (const anahtar of ['PUBLIC_BASE_URL', 'ADMIN_PASSWORD', 'SESSION_SECRET']) {
@@ -121,10 +129,10 @@ export async function calistir() {
   });
 
   /* B5 — compose ta sabitlenen degerler .env den ezilemez */
-  await test('B5', 'NODE_ENV/PORT/DATA_DIR kok .env den container a SIZMIYOR', async () => {
+  await test('B5', 'NODE_ENV/PORT/DATA_DIR backend/.env den container a SIZMIYOR', async () => {
     // Bu uc deger imaja gomulu backend/.env.production dosyasindan gelir ve
     // compose'un `environment:` blogunda BILEREK listelenmez. Compose yalnizca
-    // listeledigi degiskenleri container'a gecirdigi icin, kok .env dosyasina
+    // listeledigi degiskenleri container'a gecirdigi icin, backend/.env dosyasina
     // yanlislikla yazilan bir NODE_ENV=development container'a ulasamaz.
     const { cikti } = composeConfig(
       'PUBLIC_BASE_URL=https://x.test\nADMIN_PASSWORD=abc\nSESSION_SECRET=def\n' +
@@ -146,10 +154,15 @@ export async function calistir() {
 
   /* B9 — her iki servisin portu host a gercekten yayinlaniyor mu */
   await test('B9', 'api ve web portlari host a yayinlaniyor (ports mapping var)', async () => {
-    const { cikti } = kabukTolere(`docker compose ps --format json`);
-    const satirlar = cikti.trim().split('\n').filter(Boolean).map((s) => JSON.parse(s));
-
-    const kontrol = (servis, hedefPort) => {
+    // Iki ayri compose projesi: api backend/ dizininden, web frontend/ dizininden.
+    const kontrol = (dizin, servis, hedefPort) => {
+      const { cikti } = kabukTolere('docker compose ps --format json', { cwd: join(KOK, dizin) });
+      let satirlar;
+      try {
+        satirlar = cikti.trim().split('\n').filter(Boolean).map((s) => JSON.parse(s));
+      } catch {
+        return null;
+      }
       const c = satirlar.find((s) => s.Service === servis);
       if (!c) return null;
       const yayinlanan = Array.isArray(c.Publishers)
@@ -162,18 +175,24 @@ export async function calistir() {
       return c.Ports || `host:${yayinlanan[0].PublishedPort} -> ${hedefPort}`;
     };
 
-    const api = kontrol('api', 3000);
-    const web = kontrol('web', 8080);
+    const api = kontrol('backend', 'api', 3000);
+    const web = kontrol('frontend', 'web', 8080);
     if (!api && !web) return { skip: true, detay: 'container calismiyor' };
     return { detay: `api: ${api ?? '-'} | web: ${web ?? '-'}` };
   });
 
   /* B10 — yayinlanan portlardan HTTP yaniti geliyor mu */
   await test('B10', 'Host portlarindan /healthz 200 donuyor (api + web)', async () => {
-    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
-    const oku = (k, vars) => new RegExp(`^${k}=(\\d+)$`, 'm').exec(envMetin)?.[1] ?? vars;
-    const apiPort = oku('API_PORT', '3000');
-    const webPort = oku('WEB_PORT', '5173');
+    const portOku = (dosya, k, vars) => {
+      try {
+        const metin = readFileSync(join(KOK, dosya), 'utf8');
+        return new RegExp(`^${k}=(\\d+)$`, 'm').exec(metin)?.[1] ?? vars;
+      } catch {
+        return vars;
+      }
+    };
+    const apiPort = portOku('backend/.env', 'API_PORT', '3000');
+    const webPort = portOku('frontend/.env', 'WEB_PORT', '5173');
 
     const dene = (port) =>
       kabukTolere(
@@ -195,7 +214,7 @@ export async function calistir() {
 
   /* B13 — arayuz API adresini calisma aninda aliyor mu */
   await test('B13', 'web imajinda calisma zamani yapilandirmasi YOK (goreli yol)', async () => {
-    const webKapsayici = kabukTolere('docker compose ps -q web 2>/dev/null').cikti.trim();
+    const webKapsayici = kabukTolere('docker compose ps -q web 2>/dev/null', { cwd: join(KOK, 'frontend') }).cikti.trim();
     if (!webKapsayici) return { skip: true, detay: 'web container calismiyor' };
 
     // Eski mekanizma (/config.js + API_BASE_URL) kaldirildi: arayuz uretimde
@@ -210,7 +229,12 @@ export async function calistir() {
     );
 
     // Paketlenmis JS goreli yol kullanmali: mutlak API adresi gomulu OLMAMALI.
-    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
+    let envMetin = '';
+    try {
+      envMetin = readFileSync(join(KOK, 'frontend/.env'), 'utf8');
+    } catch {
+      // dosya yoksa varsayilan port
+    }
     const webPort = /^WEB_PORT=(\d+)$/m.exec(envMetin)?.[1] ?? '5173';
     const indeks = kabukTolere(`curl -s --max-time 10 http://localhost:${webPort}/`).cikti;
     bekle(!/config\.js/.test(indeks), 'index.html hala config.js yukluyor');

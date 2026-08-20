@@ -70,7 +70,15 @@ export async function readZipEntries(
           stream.on('data', (chunk: Buffer) => {
             toplam += chunk.length;
             if (toplam > maxEntryBytes) {
+              // Girdi, merkezi dizinde beyan ettigi boyutu asiyor: dosya bozuk
+              // ya da kasitli (zip bomb). Akisi kesip TUM cozumlemeyi durdur —
+              // yalnizca stream.destroy() cagirmak okuma dongusunu bir sonraki
+              // girdiye tasimadigi icin promise'i sonsuza dek asili birakirdi.
               stream.destroy();
+              basarisiz(
+                new IpaParseError(`Arsiv girdisi ("${path}") beyan edilen boyutunu asiyor — dosya bozuk olabilir.`),
+                'Arsiv okunurken hata olustu.',
+              );
               return;
             }
             parcalar.push(chunk);

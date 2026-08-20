@@ -192,7 +192,9 @@ export class BuildsRepository {
     const parametreler: unknown[] = [];
 
     if (!includeInactive) {
-      kosullar.push('expires_at > ? AND revoked_at IS NULL');
+      // "Aktif" tanimi getStatus() ile birebir ayni olmali: suresi gecmemis,
+      // iptal edilmemis VE dosyalari silinmemis.
+      kosullar.push('expires_at > ? AND revoked_at IS NULL AND files_deleted_at IS NULL');
       parametreler.push(Date.now());
     }
     if (search?.trim()) {
@@ -282,9 +284,9 @@ export class BuildsRepository {
       .prepare<[number, number], { total: number; active: number; totalBytes: number; activeBytes: number }>(
         `SELECT
            COUNT(*) AS total,
-           COALESCE(SUM(CASE WHEN expires_at > ? AND revoked_at IS NULL THEN 1 ELSE 0 END), 0) AS active,
+           COALESCE(SUM(CASE WHEN expires_at > ? AND revoked_at IS NULL AND files_deleted_at IS NULL THEN 1 ELSE 0 END), 0) AS active,
            COALESCE(SUM(CASE WHEN files_deleted_at IS NULL THEN size_bytes ELSE 0 END), 0) AS totalBytes,
-           COALESCE(SUM(CASE WHEN files_deleted_at IS NULL AND expires_at > ? THEN size_bytes ELSE 0 END), 0) AS activeBytes
+           COALESCE(SUM(CASE WHEN expires_at > ? AND revoked_at IS NULL AND files_deleted_at IS NULL THEN size_bytes ELSE 0 END), 0) AS activeBytes
          FROM builds`,
       )
       .get(now, now)!;

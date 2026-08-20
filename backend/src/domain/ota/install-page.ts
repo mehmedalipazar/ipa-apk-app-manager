@@ -173,6 +173,11 @@ export function renderInstallPage(input: InstallPageInput): string {
   }
 
   /* --- iOS disi cihaz: QR goster --- */
+  // DIKKAT: iPadOS 13+ varsayilan olarak masaustu Safari UA'si verir
+  // ("Macintosh", "Mobile" yok) ve sunucudan Mac'ten AYIRT EDILEMEZ. Bu yuzden
+  // sayfaya gizli bir kurulum blogu + kucuk bir dokunmatik tespit betigi konur:
+  // Mac'te maxTouchPoints 0'dir, iPad'de > 1. JS kapaliysa sayfa QR gorunumunde
+  // kalir (eski davranis); iPhone/iPad UA'lari zaten dogrudan butonu alir.
   if (!input.isIos) {
     const qr = input.showQrCode
       ? `<div class="card qr">
@@ -183,6 +188,21 @@ export function renderInstallPage(input: InstallPageInput): string {
          </div>`
       : '';
 
+    const ipadKurulum = input.installUrl
+      ? `<div id="ipad-kurulum" hidden>
+           <a class="btn" href="${escapeHtml(input.installUrl)}">Uygulamayi Yukle</a>
+         </div>
+         <script>
+         (function () {
+           if (!(/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)) return;
+           var kurulum = document.getElementById('ipad-kurulum');
+           var uyari = document.getElementById('masaustu-uyari');
+           if (kurulum) kurulum.hidden = false;
+           if (uyari) uyari.hidden = true;
+         })();
+         </script>`
+      : '';
+
     return shell(
       baslik,
       `<div class="head">
@@ -190,7 +210,8 @@ export function renderInstallPage(input: InstallPageInput): string {
          <h1>${escapeHtml(build.appName)}</h1>
          <p class="sub">Surum ${escapeHtml(build.version)} (${escapeHtml(build.buildNumber)})</p>
        </div>
-       <div class="notice warn">
+       ${ipadKurulum}
+       <div class="notice warn" id="masaustu-uyari">
          Bu uygulama yalnizca <strong>iPhone ve iPad</strong> cihazlara kurulabilir.
          Kurulum icin bu sayfayi iOS cihazinizda <strong>Safari</strong> ile acin.
        </div>
@@ -244,11 +265,11 @@ export function renderInstallPage(input: InstallPageInput): string {
 /** Suresi dolmus / iptal edilmis / bulunamayan linkler icin. */
 export function renderUnavailablePage(
   siteName: string,
-  status: BuildStatus | 'notfound',
+  status: BuildStatus | 'notfound' | 'yapilandirma',
   appName?: string,
   expiresAt?: number,
 ): string {
-  const metinler: Record<BuildStatus | 'notfound', { emoji: string; baslik: string; aciklama: string }> = {
+  const metinler: Record<BuildStatus | 'notfound' | 'yapilandirma', { emoji: string; baslik: string; aciklama: string }> = {
     expired: {
       emoji: '&#9203;',
       baslik: 'Linkin suresi doldu',
@@ -271,6 +292,12 @@ export function renderUnavailablePage(
       baslik: 'Link bulunamadi',
       aciklama: 'Adres hatali olabilir. Linki eksiksiz kopyaladiginizdan emin olun.',
     },
+    yapilandirma: {
+      emoji: '&#9888;&#65039;',
+      baslik: 'Kurulum su anda yapilamiyor',
+      aciklama:
+        'Sunucu yapilandirmasi eksik oldugu icin kurulum baslatilamiyor. Sorun sizde degil — uygulamayi paylasan kisiye haber verin.',
+    },
     active: { emoji: '', baslik: '', aciklama: '' },
   };
 
@@ -290,10 +317,16 @@ export function renderUnavailablePage(
   );
 }
 
-/** iPhone/iPad tespiti. iPadOS 13+ masaustu Safari gibi davranir. */
+/**
+ * iPhone/iPad tespiti — yalnizca UA'dan.
+ *
+ * iPadOS 13+ varsayilan (masaustu) modda "Macintosh" der ve Mobile/ TASIMAZ;
+ * o durum sunucudan ayirt edilemez ve renderInstallPage icindeki dokunmatik
+ * tespit betigiyle istemci tarafinda yakalanir. Buradaki Mobile/ kontrolu
+ * yalnizca "mobil site iste" acik olan iPad'leri yakalar.
+ */
 export function isIosUserAgent(ua: string | undefined): boolean {
   if (!ua) return false;
   if (/iPhone|iPad|iPod/i.test(ua)) return true;
-  // iPadOS 13+ "Macintosh" der; dokunmatik destegi ile ayrilir.
   return /Macintosh/i.test(ua) && /Mobile\//i.test(ua);
 }

@@ -30,6 +30,8 @@ export function UploadPage() {
   const [limitler, setLimitler] = useState<Pick<AppConfig, 'maxUploadMb' | 'maxTtlHours' | 'defaultTtlHours' | 'showQrCode'> | null>(null);
   const iptalRef = useRef<AbortController | null>(null);
 
+  const maxTtl = limitler?.maxTtlHours ?? 720;
+
   // Sunucudaki sinirlari al; alinamazsa sunucu yine de dogrulayacak.
   useEffect(() => {
     void api
@@ -58,8 +60,16 @@ export function UploadPage() {
     setDurum('hazir');
   };
 
+  /**
+   * Alan bosaltilinca Number('') = 0 olur; sunucu 0'i "verilmedi" sayip
+   * varsayilana doner ama kullanicinin bunu gonderirken gormesi daha dogru:
+   * gecersiz degerde buton kapali kalir (BuildsPage'teki panelle ayni kural).
+   */
+  const gecerliTtl =
+    Number.isFinite(ttlHours) && ttlHours >= 1 ? Math.min(Math.round(ttlHours), maxTtl) : null;
+
   const yukle = async () => {
-    if (!dosya) return;
+    if (!dosya || gecerliTtl === null) return;
     setDurum('yukleniyor');
     setHata(null);
     setYuzde(0);
@@ -70,7 +80,7 @@ export function UploadPage() {
     try {
       const yanit = await uploadIpa({
         file: dosya,
-        ttlHours,
+        ttlHours: gecerliTtl,
         note: not,
         password: sifre,
         signal: controller.signal,
@@ -157,8 +167,10 @@ export function UploadPage() {
               </>
             ) : (
               <Alert kind="err">
-                Kurulum linki uretilemedi cunku genel adres (Base URL) ayarlanmamis.{' '}
-                <Link to="/admin/ayarlar">Ayarlar</Link> bolumunden servisin https adresini girin.
+                Kurulum linki uretilemedi cunku genel adres (Base URL) ayarlanmamis. Bu deger
+                panelden degistirilemez: sunucuda <code>PUBLIC_BASE_URL</code> ortam degiskenini
+                servisin https adresine ayarlayip yeniden baslatin (mevcut durum{' '}
+                <Link to="/admin/ayarlar">Ayarlar</Link> sayfasinda gorunur).
               </Alert>
             )}
 
@@ -179,8 +191,6 @@ export function UploadPage() {
   }
 
   /* --- Yukleme formu --- */
-  const maxTtl = limitler?.maxTtlHours ?? 720;
-
   return (
     <div className="main narrow">
       <div className="page-head">
@@ -254,8 +264,8 @@ export function UploadPage() {
                       type="number"
                       min={1}
                       max={maxTtl}
-                      value={ttlHours}
-                      onChange={(e) => setTtlHours(Number(e.target.value))}
+                      value={Number.isFinite(ttlHours) ? ttlHours : ''}
+                      onChange={(e) => setTtlHours(e.target.value === '' ? NaN : Number(e.target.value))}
                     />
                     <span className="unit">saat</span>
                   </div>
@@ -271,6 +281,11 @@ export function UploadPage() {
                       </button>
                     ))}
                   </div>
+                  {gecerliTtl === null && (
+                    <div className="help" style={{ marginTop: 7, marginBottom: 0, color: 'var(--err, #b3261e)' }}>
+                      Gecerli bir saat degeri girin (en az 1).
+                    </div>
+                  )}
                 </div>
 
                 <div className="field">
@@ -307,7 +322,7 @@ export function UploadPage() {
           <div style={{ marginTop: 18, display: 'flex', gap: 9 }}>
             <button
               className="btn lg block"
-              disabled={durum === 'yukleniyor'}
+              disabled={durum === 'yukleniyor' || gecerliTtl === null}
               onClick={() => void yukle()}
             >
               {durum === 'yukleniyor' ? (

@@ -17,6 +17,14 @@ const HASH_KEY = 'auth.adminPasswordHash';
 export const ADMIN_SUBJECT = 'admin';
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 saat
 
+/*
+ * Oturum imzasi SESSION_SECRET + guncel sifre ozetiyle atilir. Boylece sifre
+ * degistiginde onceki TUM oturumlar kendiliginden gecersizlesir — calinmis bir
+ * cerez, sifre degistirilerek etkisiz kilinabilir (2026-08-20 duzeltmesi). Imzali kurulum
+ * linkleri BUNDAN ETKILENMEZ — onlar LinkService icinde ham SESSION_SECRET
+ * ile imzalanir.
+ */
+
 export class AuthService {
   private readonly repo: SettingsRepository;
   private readonly secret: string;
@@ -52,16 +60,22 @@ export class AuthService {
     return Boolean(this.repo.get<string>(HASH_KEY));
   }
 
+  /** Oturum imza anahtari: SESSION_SECRET + kayitli sifre ozeti. */
+  private oturumAnahtari(): string {
+    const hash = this.repo.get<string>(HASH_KEY) ?? '';
+    return `${this.secret}\n${hash}`;
+  }
+
   /** Dogruysa oturum belirteci, degilse null doner. */
   async login(password: string): Promise<string | null> {
     const hash = this.repo.get<string>(HASH_KEY);
     if (!hash) return null;
     if (!(await verifyPassword(password, hash))) return null;
-    return createSession(this.secret, ADMIN_SUBJECT, SESSION_TTL_MS);
+    return createSession(this.oturumAnahtari(), ADMIN_SUBJECT, SESSION_TTL_MS);
   }
 
   verify(token: string | undefined): SessionPayload | null {
-    return verifySession(this.secret, token);
+    return verifySession(this.oturumAnahtari(), token);
   }
 
   async changePassword(current: string, next: string): Promise<void> {

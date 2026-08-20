@@ -5,11 +5,16 @@
  * C grubu canli arka uc ornegini hedefler (varsayilan http://localhost:3000).
  */
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { grup, test, bekle, esit, sunucuBaslat, Istemci, KOK, uyu } from './lib/harness.mjs';
+import { grup, test, bekle, esit, sunucuBaslat, sunucuIle, Istemci, KOK, uyu } from './lib/harness.mjs';
 
 const SIFRE = 'TestSifresi-1453!';
 const FIX = join(KOK, 'tests/fixtures');
+
+// 2026-08-13 ayriminda kok node_modules kalkti; better-sqlite3 artik yalnizca
+// backend/node_modules altinda. Testler onu backend'in cozumleyicisiyle bulur.
+const backendRequire = createRequire(join(KOK, 'backend/package.json'));
 
 /**
  * Kurulum sayfasi User-Agent e gore IKI FARKLI icerik uretir:
@@ -78,7 +83,13 @@ export async function calistir({ taban }) {
   });
 
   await test('C3b', 'Arayuz servisi SPA fallback yapiyor (/admin/ayarlar → index.html)', async () => {
-    const envMetin = readFileSync(join(KOK, '.env'), 'utf8');
+    // WEB_PORT artik frontend/.env icinde (kok .env 2026-08-13'te kaldirildi).
+    let envMetin = '';
+    try {
+      envMetin = readFileSync(join(KOK, 'frontend/.env'), 'utf8');
+    } catch {
+      // dosya yoksa varsayilan port kullanilir
+    }
     const webPort = /^WEB_PORT=(\d+)$/m.exec(envMetin)?.[1] ?? '5173';
     const webTaban = `http://localhost:${webPort}`;
 
@@ -543,10 +554,17 @@ export async function calistir({ taban }) {
     });
 
     await test('F4b', 'iOS DISI istemciye kurulum dugmesi gosterilmiyor (uyari sayfasi)', async () => {
+      // 2026-08-20: iPadOS 13+ masaustu UA'si Mac'ten ayirt edilemedigi icin
+      // sayfada GIZLI (hidden) bir kurulum blogu + dokunmatik tespit betigi
+      // durur; JS Mac'te blogu ACMAZ. Gorunur icerik hala uyari sayfasidir.
       const html = String((await c.get(`/i/${anaBuild.token}`)).govde);
-      bekle(!html.includes('itms-services'), 'iOS disi istemciye itms-services linki sizdi');
+      bekle(/<div id="ipad-kurulum" hidden>/.test(html), 'iPad kurulum blogu hidden degil ya da yok');
+      bekle(/maxTouchPoints/.test(html), 'dokunmatik tespit betigi yok');
+      // itms linki YALNIZCA gizli blogun icinde olmali.
+      const gizliBlokDisi = html.replace(/<div id="ipad-kurulum" hidden>[\s\S]*?<\/div>/, '');
+      bekle(!gizliBlokDisi.includes('itms-services'), 'itms-services linki gizli blok DISINA sizdi');
       bekle(/yalnizca <strong>iPhone ve iPad<\/strong>/.test(html), 'iOS disi uyarisi yok');
-      return { detay: 'UA ayrimi calisiyor' };
+      return { detay: 'uyari sayfasi + yalnizca gizli iPad blogunda buton' };
     });
 
     await test('F5', 'Kurulum sayfasi: siteName + installNote + QR gorunuyor', async () => {
@@ -636,8 +654,10 @@ export async function calistir({ taban }) {
       esit(son.status, 206, 'sondan okuma');
       esit(son.govde.length, 500, 'son 500 bayt');
 
+      // 2026-08-20: dosya disinda BASLAYAN aralik RFC 9110 geregi 416 doner
+      // (eskiden sessizce 200 tam govdeye dusuluyordu). Ayrinti: H3.
       const gecersiz = await c.get(yol, { ham: true, headers: { range: 'bytes=99999999-' } });
-      bekle(gecersiz.status === 200, `aralik disi istek 200 e dusmeli, gercek ${gecersiz.status}`);
+      bekle(gecersiz.status === 416, `aralik disi istek 416 donmeli, gercek ${gecersiz.status}`);
       return { detay: '206 + content-range dogru' };
     });
 
@@ -713,7 +733,7 @@ export async function calistir({ taban }) {
       // Suresini gecmise cek: 'upload' baz + 1 saat, ama kayit yeni... bunun
       // yerine dogrudan DB uzerinden degil, ttlFrom='upload' + 1 saat ile
       // gecmise dusuremeyiz. Kucuk bir bekleme yerine SQL kullanilir.
-      const { default: Database } = await import('better-sqlite3');
+      const Database = backendRequire('better-sqlite3');
       const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
       db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 1000, b.id);
       db.close();
@@ -734,7 +754,7 @@ export async function calistir({ taban }) {
     await test('F14', 'Temizlik: suresi dolmus dosyalar siliniyor, kayit "purged" oluyor', async () => {
       const y = await c.yukle(join(FIX, 'demo-b.ipa'), { ttlHours: 1 });
       const b = y.govde.build;
-      const { default: Database } = await import('better-sqlite3');
+      const Database = backendRequire('better-sqlite3');
       const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
       db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 100_000_000, b.id);
       db.close();
@@ -828,7 +848,7 @@ export async function calistir({ taban }) {
     });
 
     await test('F20', 'Yanlis uzanti 400 ile reddediliyor', async () => {
-      const r = await c.yukle(join(KOK, 'package.json'));
+      const r = await c.yukle(join(KOK, 'backend/package.json')); // .ipa olmayan herhangi bir dosya
       esit(r.status, 400, 'status');
       bekle(/\.ipa/i.test(r.govde.error), r.govde.error);
       return { detay: r.govde.error };
@@ -911,6 +931,164 @@ export async function calistir({ taban }) {
         bekle(k in r.govde, `${k} yok`);
       }
       return { detay: `total=${r.govde.total} active=${r.govde.active}` };
+    });
+
+
+    /* --------------------------------------------------------------- */
+    grup('H — Regresyonlar (2026-08-20 bulgulari)');
+
+    /** Kurulum sayfasi -> manifest -> imzali app.ipa yolunu (yol+sorgu) cikarir. */
+    const imzaliIpaYolu = async (token) => {
+      const sayfa = await c.get(`/i/${token}`, IOS);
+      const itms = /href="itms-services:\/\/\?action=download-manifest&amp;url=([^"]+)"/.exec(String(sayfa.govde))?.[1];
+      bekle(itms, 'itms-services linki sayfada yok');
+      const manifestUrl = new URL(decodeURIComponent(itms.replace(/&amp;/g, '&')));
+      const man = await c.get(manifestUrl.pathname + manifestUrl.search);
+      esit(man.status, 200, 'manifest');
+      const ipa = /<string>(https?:\/\/[^<]*app\.ipa[^<]*)<\/string>/.exec(String(man.govde))?.[1]?.replace(/&amp;/g, '&');
+      bekle(ipa, 'manifest icinde app.ipa adresi yok');
+      const u = new URL(ipa);
+      return u.pathname + u.search;
+    };
+
+    await test('H1', 'Dosyalari silinmis (purged) link yeniden ACILAMIYOR (409) ve aktif sayilmiyor', async () => {
+      const once = (await c.get('/api/stats')).govde;
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 720 });
+      const b = y.govde.build;
+      await c.patch(`/api/builds/${b.id}`, { revoked: true });
+      await ayarla({ purgeAfterExpiryHours: 0 });
+      await c.post('/api/maintenance/cleanup');
+      await ayarla({ purgeAfterExpiryHours: 24 });
+      esit((await c.get(`/api/builds/${b.id}`)).govde.status, 'purged', 'temizlik sonrasi status');
+
+      const un = await c.patch(`/api/builds/${b.id}`, { revoked: false });
+      esit(un.status, 409, 'unrevoke purged kayitta reddedilmeli');
+
+      // Tutarlilik: purged kayit ne "sadece aktif" listesinde ne istatistikte.
+      const liste = await c.get('/api/builds?onlyActive=true&limit=200');
+      bekle(!liste.govde.items.some((x) => x.id === b.id), 'purged kayit onlyActive listesinde');
+      const sonra = (await c.get('/api/stats')).govde;
+      esit(sonra.active, once.active, 'stats.active purged kaydi saymamali');
+      esit(sonra.activeBytes, once.activeBytes, 'stats.activeBytes purged kaydi saymamali');
+
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: '409 + liste/istatistik tutarli' };
+    });
+
+    await test('H2', 'stats.activeBytes iptal edilmis (revoked) kaydi saymiyor', async () => {
+      const once = (await c.get('/api/stats')).govde;
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      const b = y.govde.build;
+      await c.patch(`/api/builds/${b.id}`, { revoked: true });
+      const sonra = (await c.get('/api/stats')).govde;
+      esit(sonra.active, once.active, 'active');
+      esit(sonra.activeBytes, once.activeBytes, 'activeBytes revoked kaydi saymamali');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: `revoked ${b.sizeBytes} bayt sayilmadi` };
+    });
+
+    await test('H3', 'Indirme sayaci: Range parcalari ve HEAD ayri indirme sayilmiyor; 416 dogru', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      const b = y.govde.build;
+      const yol = await imzaliIpaYolu(b.token);
+      const boyut = b.sizeBytes;
+
+      esit((await c.get(yol, { ham: true })).status, 200, 'tam indirme');                                     // sayilir (1)
+      esit((await c.get(yol, { headers: { range: 'bytes=100-199' }, ham: true })).status, 206, 'orta parca'); // sayilmaz
+      esit((await c.istek(yol, { method: 'HEAD' })).status, 200, 'HEAD');                                     // sayilmaz
+      esit((await c.get(yol, { headers: { range: 'bytes=0-99' }, ham: true })).status, 206, 'bastan parca');  // sayilir (2)
+
+      // RFC 9110: son bayt otesine uzanan istek kirpilarak 206 doner...
+      const tasan = await c.get(yol, { headers: { range: `bytes=0-${boyut + 999}` }, ham: true });            // sayilir (3)
+      esit(tasan.status, 206, 'end>=size kirpilip 206 donmeli');
+      esit(tasan.headers.get('content-range'), `bytes 0-${boyut - 1}/${boyut}`, 'kirpilmis content-range');
+
+      // ...dosya disinda BASLAYAN istek ise 416.
+      const dis = await c.get(yol, { headers: { range: `bytes=${boyut + 1}-` }, ham: true });
+      esit(dis.status, 416, 'start>=size 416 donmeli');
+      esit(dis.headers.get('content-range'), `bytes */${boyut}`, '416 content-range');
+
+      const dto = (await c.get(`/api/builds/${b.id}`)).govde;
+      esit(dto.downloadCount, 3, 'yalnizca bastan baslayan govdeli indirmeler sayilmali');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'tam + 2x bastan parca = 3; orta parca/HEAD/416 sayilmadi' };
+    });
+
+    await test('H4', 'Sifre degisince eski oturumlar dusuyor', async () => {
+      await sunucuIle({ ADMIN_PASSWORD: SIFRE, PUBLIC_BASE_URL: 'https://ota.test', LOG_LEVEL: 'warn' }, async (g) => {
+        bekle(g.hazir, g.cikti.slice(-300));
+        const eski = g.istemci();
+        const aktif = g.istemci();
+        esit((await eski.post('/api/auth/login', { password: SIFRE })).status, 200, 'eski giris');
+        esit((await aktif.post('/api/auth/login', { password: SIFRE })).status, 200, 'aktif giris');
+
+        const r = await aktif.post('/api/auth/password', { currentPassword: SIFRE, newPassword: 'YepyeniSifre-2026' });
+        esit(r.status, 200, 'sifre degisimi');
+
+        esit((await eski.get('/api/builds')).status, 401, 'eski oturum sifre degisince dusmeli');
+        esit((await aktif.get('/api/builds')).status, 200, 'degistiren oturum (tazelenen cerezle) calismali');
+      });
+      return { detay: 'eski cerez 401, tazelenen cerez 200' };
+    });
+
+    await test('H5', 'Giris denemeleri hiz sinirina takiliyor (5 hata -> 429)', async () => {
+      await sunucuIle({ ADMIN_PASSWORD: SIFRE, LOG_LEVEL: 'warn' }, async (g) => {
+        bekle(g.hazir, g.cikti.slice(-300));
+        const k = g.istemci();
+        for (let i = 1; i <= 5; i++) {
+          esit((await k.post('/api/auth/login', { password: `yanlis-${i}` })).status, 401, `deneme ${i}`);
+        }
+        const kilit = await k.post('/api/auth/login', { password: SIFRE }); // dogru sifre bile
+        esit(kilit.status, 429, '6. deneme kilitlenmeli');
+        bekle(/dakika/i.test(kilit.govde?.error ?? ''), 'mesaj bekleme suresini soylemiyor');
+      });
+      return { detay: '5x401 sonrasi dogru sifreye bile 429' };
+    });
+
+    await test('H6', 'ttlHours=0 sessizce 1 saatlik link uretmiyor (varsayilana donuyor)', async () => {
+      await ayarla({ defaultTtlHours: 24 });
+      const r = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 0 });
+      esit(r.status, 201, 'yukleme');
+      esit(r.govde.build.ttlHours, 24, '0 "verilmedi" sayilip varsayilan kullanilmali');
+      await c.del(`/api/builds/${r.govde.build.id}`);
+      return { detay: '0 -> 24 (varsayilan)' };
+    });
+
+    await test('H7', 'Yanlis sifre denemesi goruntuleme sayacini artirmiyor', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'), { password: 'gizli-123' });
+      const b = y.govde.build;
+      await c.get(`/i/${b.token}`); // gercek goruntuleme (+1)
+      const v1 = (await c.get(`/api/builds/${b.id}`)).govde.viewCount;
+      for (let i = 0; i < 3; i++) {
+        await c.istek(`/i/${b.token}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: 'password=yanlis',
+        });
+      }
+      const v2 = (await c.get(`/api/builds/${b.id}`)).govde.viewCount;
+      esit(v2, v1, 'yanlis denemeler sayilmamali');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: `viewCount ${v1} -> ${v2}` };
+    });
+
+    await test('H8', 'iPad (masaustu gorunumu) kurulum butonuna JS tespitiyle kavusuyor', async () => {
+      // iPadOS 13+ masaustu Safari ile ayni UA'yi verir; sunucu ayirt edemez.
+      // Sayfa QR gorunumune gizli bir kurulum blogu + dokunmatik tespit betigi koyar.
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      const b = y.govde.build;
+      const macUA =
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
+      const sayfa = await c.get(`/i/${b.token}`, { headers: { 'user-agent': macUA } });
+      const govde = String(sayfa.govde);
+      bekle(govde.includes('id="ipad-kurulum"'), 'gizli iPad kurulum blogu yok');
+      bekle(/itms-services:/.test(govde), 'iPad blogunda itms-services linki yok');
+      bekle(/maxTouchPoints/.test(govde), 'dokunmatik tespit betigi yok');
+      // iPhone gorunumu eskisi gibi dogrudan buton icermeli.
+      const tel = String((await c.get(`/i/${b.token}`, IOS)).govde);
+      bekle(/itms-services:/.test(tel), 'iPhone gorunumunde buton yok');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'Macintosh UA: gizli buton + tespit betigi' };
     });
 
     /* --------------------------------------------------------------- */

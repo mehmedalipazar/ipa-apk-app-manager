@@ -38,7 +38,17 @@ const EnvSchema = z.object({
    * uretimde goreli yol (relative path) kullanir; buradaki deger ise iOS'un
    * gordugu mutlak adrestir ve mutlaka https olmalidir.
    */
-  PUBLIC_BASE_URL: z.string().default(''),
+  PUBLIC_BASE_URL: z
+    .string()
+    .default('')
+    .transform((v) => v.trim().replace(/\/+$/, ''))
+    // Semasiz bir deger ("alan.adi" gibi) eskiden ayar katmaninda SESSIZCE
+    // atiliyor ve uyari "PUBLIC_BASE_URL ayarlayin" diyordu — deger ayarliyken
+    // yanlis teshis. Bicim hatasi artik aciliste acikca durduruyor (2026-08-20).
+    .refine((v) => v === '' || /^https?:\/\/[^\s/]+/.test(v), {
+      message:
+        "https://alan.adi seklinde TAM adres olmali (sema dahil, sonda / olmadan) — ya da bos birakin",
+    }),
 
   /**
    * Kurulum uclarinin yol oneki (`/i/:token`, manifest.plist, app.ipa).

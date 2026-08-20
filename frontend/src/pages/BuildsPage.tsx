@@ -73,14 +73,17 @@ export function BuildsPage() {
     return () => window.clearTimeout(t);
   }, [getir, arama]);
 
-  const islem = async (id: string, fn: () => Promise<unknown>, basariMesaji: string) => {
+  /** Islemi kosar; basariliysa true doner (panel kapatma karari cagirana ait). */
+  const islem = async (id: string, fn: () => Promise<unknown>, basariMesaji: string): Promise<boolean> => {
     setIslemdeki(id);
     try {
       await fn();
       toast(basariMesaji);
       await getir();
+      return true;
     } catch (e) {
       toast(e instanceof ApiError ? e.message : 'Islem basarisiz');
+      return false;
     } finally {
       setIslemdeki(null);
     }
@@ -101,8 +104,9 @@ export function BuildsPage() {
       toast('Degisiklik yok');
       return;
     }
-    await islem(build.id, () => api.patchBuild(build.id, patch), 'Link ayarlari guncellendi');
-    setDuzenlenen(null);
+    // Hata olursa panel ACIK kalir: girilenler kaybolmasin, kullanici duzeltsin.
+    const basarili = await islem(build.id, () => api.patchBuild(build.id, patch), 'Link ayarlari guncellendi');
+    if (basarili) setDuzenlenen(null);
   };
 
   /** Iptal edilmis link yeniden acilir; suresi de dolmussa ayni sure yeniden verilir. */
