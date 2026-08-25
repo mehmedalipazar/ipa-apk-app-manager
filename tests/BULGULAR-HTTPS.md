@@ -2,9 +2,17 @@
 
 Hedef: `https://ipa-ios.simurgbilisim.com` (yayindaki gercek zincir)
 
+> **Tarihsel gunluk (2026-08-06 → 2026-08-10).** Asagidaki bulgular o gunlerin olcumleridir
+> ve uretim durusu o zamandan beri bir kez daha degisti: **2026-08-20'de CORS yeniden acildi**
+> (`backend/.env` `CORS_ORIGINS=http://localhost:5173`, cerez `SameSite=None; Secure`, CSRF
+> korumasi `backend/src/server.ts` Origin kapisi). Buradaki "CORS bosaltildi / cerez Lax"
+> ifadeleri **artik gecerli degildir**; guncel durus `CLAUDE.md` ("CORS is deliberately open")
+> ve `tests/suite-d-https.mjs` D3.3–D3.9'dur. Bu dosyadaki tek hala-gecerli D beklentisi
+> D2.4'tur (`/config.js` yok).
+
 | Kosum | Mimari | A+B+C | D |
 |---|---|---|---|
-| **2026-08-10** (guncel) | v2 — `backend/` + `frontend/` | 106/106 ✅ | 47/47 ✅ |
+| 2026-08-10 (o gunku durus; CORS karari 2026-08-20'de tersine dondu, asagida) | v2 — `backend/` + `frontend/` | 106/106 ✅ | 47/47 ✅ |
 | 2026-08-06 (tarihce, asagida) | v1 — `server/` + `web/` | 106/106 ✅ | 47/47 ✅ |
 
 Iki kosumun D'si ayni degildir: v2 yeniden yapilanmasi (7 Agustos) calisma
@@ -14,8 +22,29 @@ ve cerezi `SameSite=Lax`a cekti. Suite D'nin 4 testi (D2.4, D3.3, D3.5, D3.7)
 GERI DONMEDIGINI savunuyorlar. Kanit raporlari: `tests/reports/`
 `rapor-2026-08-10T07-00-41-231Z.json` (D 47/47) ve
 `rapor-2026-08-10T06-48-36-789Z.json` (B 14/14).
+[2026-08-25 notu: 20 Agustos'ta CORS/cerez karari bilincli olarak geri alindi;
+D3.3/D3.5/D3.7 bugun `SameSite=None` / ACAO var / preflight 2xx bekler. Yalnizca
+D2.4 (`/config.js` yok) ayni kaldi.]
 
 ---
+
+## 2026-08-20 — Durus degisti: CORS yeniden acildi (D3.3/D3.5/D3.7 beklentileri ikinci kez dondu)
+
+Servis ayrimi (2026-08-13) sonrasi karar: arayuz gelistirmesi canli API'ye CORS ile
+baglanir. `backend/.env` `CORS_ORIGINS=http://localhost:5173`; `config/env.ts` 'auto'
+kurali cerezi `SameSite=None; Secure` yapar; `@fastify/cors` kayitli; CSRF korumasi
+`server.ts`'teki Origin kapisidir (durum degistiren istekte yabanci `Origin` → 403;
+D3.8/D3.9 bunu sinar).
+
+| Test | 2026-08-10 beklentisi (asagida) | 2026-08-20'den beri |
+|---|---|---|
+| D2.4 | `/config.js` yok | degismedi |
+| D3.3 | cerez `SameSite=Lax` | `SameSite=None; Secure; HttpOnly` |
+| D3.5 | ACAO basligi yok | `access-control-allow-origin: http://localhost:5173` + credentials |
+| D3.7 | preflight 404 | `OPTIONS` 2xx + izin basliklari (PUT dahil) |
+| D3.8 / D3.9 | (yoktu) | yabanci Origin yazma istegi 403; izinli Origin gecer |
+
+Kosum kaniti: `tests/reports/rapor-2026-08-25T08-01-27-272Z.json` (B 14/14 + D 49/49, canli domain).
 
 ## 2026-08-10 — Bulgu 1: Yigin kapaliyken domain 502 ("uretim bu Mac'tir")
 
@@ -27,8 +56,12 @@ guncellemeleriyle 47/47'ye cikti.
 
 Cikarimlar:
 
-- **"Yayinda miyim?" kontrolu sertifikaya degil `https://.../healthz`e
-  bakmali.** TLS el sikismasi nginx'te biter; uygulamanin ayakta olup
+- **"Yayinda miyim?" kontrolu sertifikaya bakmamali — ama `https://.../healthz`e de
+  bakmamali:** o yola *frontend* container'inin nginx'i sabit `200 "ok"` doner
+  (`frontend/nginx.conf`), backend'in `/healthz`'i ise `/api/*` disinda kaldigi icin
+  domain'den ulasilamaz (2026-08-25'te olculdu: api kapaliyken `/healthz` 200, tum
+  `/api/*` 502). Dogru yoklama: `GET /api/settings` (401 beklenir) ya da dogrudan
+  `:3000/healthz`. TLS el sikismasi nginx'te biter; uygulamanin ayakta olup
   olmadigini soylemez.
 - LAN nginx 443'u karsilayip **bu makinenin** `:3000` / `:5173` portlarina
   aktarir. Compose kapaliyken `:3000`'i kim dinliyorsa (or. `npm run
@@ -47,6 +80,8 @@ v2'ye karsi olculen gercek degerler ve testlerin yeni beklentileri:
 | D3.3 | cerez `SameSite=None` | `Max-Age=43200; Path=/; HttpOnly; Secure; SameSite=Lax` |
 | D3.5 | `localhost:5173`e CORS izni | `access-control-allow-origin` basligi hic yok (eklenti kayitli degil) |
 | D3.7 | preflight 2xx + izin basliklari | `OPTIONS /api/settings` → 404, izin basligi yok |
+
+> D3.3 / D3.5 / D3.7 satirlari 2026-08-20'de yeniden degisti — bkz. "2026-08-20 — Durus degisti".
 
 Dordu de kod hatasi degildi; testler 6 Agustos kararlarini kodluyordu ve v2 o
 kararlari bilerek tersine cevirdi (ayni-origin tasarim: bos `CORS_ORIGINS` ⇒
@@ -130,8 +165,10 @@ dondu) — IPA yuklemesi proxy sinirina takilmiyor.
 
 **v2 (7 Agustos) bu tablodaki iki karari geri aldi:** `API_BASE_URL`
 mekanizmasi tamamen kaldirildi (arayuz uretimde goreli yol kullanir, adres
-derleme aninda gomulur) ve `CORS_ORIGINS` bosaltildi (cerez `Lax`a dondu).
-`TRUST_PROXY=true` ile `INSTALL_PATH_PREFIX=/api/i` gecerliligini koruyor.
+derleme aninda gomulur) ve `CORS_ORIGINS` bosaltildi (cerez `Lax`a dondu) —
+**bu ikincisi 2026-08-20'de yeniden acildi** (`CORS_ORIGINS=http://localhost:5173`,
+cerez `None`); `API_BASE_URL` kaldirilmis kaldi. `TRUST_PROXY=true` ile
+`INSTALL_PATH_PREFIX=/api/i` gecerliligini koruyor.
 
 O gun ayrica gercek Chrome ile giris, yukleme, link uretimi ve kurulum sayfasi
 elle dogrulandi; o gunku cerez `SameSite=None` idi (CORS listesi doluydu). DB
@@ -178,6 +215,9 @@ node tests/run-suite.mjs                          # hepsi (A/B/C/D)
 ```
 
 Grup D digerlerinden ayridir: izole sunucu baslatmaz, yayindaki ornegi hedefler.
-Adresi, oneki ve admin sifresini `.env`den okur. Olusturdugu tum surumleri D12'de
-siler. Kosumdan once yiginin ayakta oldugunu dogrulayin (`docker compose ps`) —
-degilse tum HTTP testleri 502 ile duser (bkz. Bulgu 1).
+Adresi, oneki ve admin sifresini `backend/.env`den okur (`PUBLIC_BASE_URL`,
+`INSTALL_PATH_PREFIX`, `ADMIN_PASSWORD`); canli panele o sifreyle girer, 3 surum
+yukler (D5.1, D9.2, D10.1), birini iptal eder (D9.4) ve D12.1'de hepsini siler —
+URETIME dokunur, yarida kesilirse artiklari panelden silin. Kosumdan once yiginin
+ayakta oldugunu dogrulayin (`cd backend && docker compose ps`) — degilse tum HTTP
+testleri 502 ile duser (bkz. Bulgu 1).

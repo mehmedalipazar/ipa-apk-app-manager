@@ -3,7 +3,9 @@
  *
  * Buradaki tipler `backend/src/modules/builds/build.dto.ts` ve
  * `backend/src/config/settings.schema.ts` ile ELLE senkron tutulur; ikisi
- * degistiginde bu dosya da guncellenmeli. Hicbir arac bu kaymayi yakalamaz.
+ * degistiginde bu dosya da guncellenmeli. Derleyici bu kaymayi yakalamaz;
+ * tests/suite-c-api.mjs C10 (AppConfig) ve C10b (BuildDto) yalnizca alan
+ * ADLARINI karsilastirir — tip degisikligi yine elle takip edilir.
  */
 
 /* --- API adresi ----------------------------------------------------------- */
@@ -21,7 +23,8 @@
  *                         uretim CORS_ORIGINS'i 5173'u listeler ve CSRF
  *                         korumasi backend'in Origin dogrulama katmanindadir
  *                         (bilincli karar, 2026-08-10). Yerel backend ile
- *                         calismak icin .env.local:
+ *                         calismak icin .env.development.local (.env.local
+ *                         DEGIL — Vite onu mode dosyasindan ONCE yukler):
  *                             VITE_API_BASE_URL=http://localhost:3000
  *
  * Calisma zamani yapilandirmasi (eski window.__IPA_OTA_CONFIG__ / config.js)

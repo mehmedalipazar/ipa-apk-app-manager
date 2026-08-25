@@ -1,8 +1,8 @@
 # ipa-ota-download
 
 Kendi sunucunuzda çalışan iOS **OTA (over-the-air)** dağıtım servisi. IPA'yı panelden
-yükleyin, süreli bir kurulum linki alın; alıcı linki iPhone'da Safari ile açıp tek
-dokunuşla kurar. Diawi / InstallOnAir muadili — dosyalarınız üçüncü taraf sunucuya çıkmaz.
+yükleyin, süreli bir kurulum linki alın; alıcı linki iPhone'da mobil tarayıcısıyla
+açıp tek dokunuşla kurar. Diawi / InstallOnAir muadili — dosyalarınız üçüncü taraf sunucuya çıkmaz.
 
 Öne çıkanlar: sürükle-bırak yükleme, otomatik IPA çözümleme (paket adı, sürüm, simge),
 süreli + şifreli + QR kodlu linkler, admin panel (sürümler, sayaçlar, tüm ayarlar),
@@ -35,7 +35,7 @@ kalkar:
 | bağımlılıklar | `backend/package.json` + kendi `package-lock.json` | `frontend/package.json` + kendi `package-lock.json` |
 | derleme ayarı | `backend/tsconfig.json` (kendi kendine yeter) | `frontend/tsconfig.json` |
 | compose sırları | `backend/.env` | `frontend/.env` |
-| uygulama ayarı | `.env.development` / `.env.production` / `.env.local` | aynı üçlü (Vite okur) |
+| uygulama ayarı | `.env.development` / `.env.production` / `.env.local` (Node) | `.env.development` / `.env.production` / `.env.development.local` (Vite; `.env.local` mode dosyasını **ezemez**) |
 | yayın | `backend/docker-compose.yml` → proje `ipa-ota-backend` | `frontend/docker-compose.yml` → proje `ipa-ota-frontend` |
 | veri | `backend/data-docker/` | yok (durum tutmaz) |
 
@@ -80,11 +80,13 @@ kendi `.env`'i içinde `WEB_PORT` / `API_PORT` ile değişir; container-içi por
   imaja gömülü `backend/.env.production` içindedir (sırsız). `NODE_ENV`, `PORT` ve
   `DATA_DIR` compose'a bilerek yazılmamıştır — tek kaynakları imajdır; `backend/.env`e
   yanlışlıkla yazılan bir değer container'a ulaşamaz.
-- **`.env` dosyalarını Node okumaz.** Her iki serviste de `.env` yalnızca `docker compose`
-  içindir; uygulamanın kendi ortam dosyaları `.env.development` / `.env.production` /
-  `.env.local`'dır ve `package.json` içinde açıkça listelenir. Tek istisna: **Vite**
-  `frontend/.env`'i de yükler — bu yüzden oraya `VITE_` önekli bir değişken yazmayın,
-  sessizce derlemeye sızar.
+- **`.env` dosyalarını Node okumaz.** Her iki serviste de `.env` yalnızca
+  `docker compose` içindir. Backend'in kendi ortam dosyaları `.env.development` /
+  `.env.production` / `.env.local`'dır ve `package.json` içinde açıkça listelenir.
+  Frontend'de dosyaları Vite kendi kuralıyla yükler (`.env` → `.env.local` →
+  `.env.[mode]` → `.env.[mode].local`) — bu yüzden **`frontend/.env`'e `VITE_` önekli
+  bir değişken yazmayın**, sessizce derlemeye sızar; makineye özel ezme
+  `.env.development.local`'a yazılır (`.env.local` mode dosyasını ezemez).
 - Compose proje adları dosyalarda sabitlenmiştir (`ipa-ota-backend`, `ipa-ota-frontend`).
   Aksi halde compose dizin adını (`backend`, `frontend`) kullanır ve iki servis karışır.
 
@@ -227,7 +229,7 @@ OTA kurulumunu bozar. Kurulum yollarına oturum kontrolü eklemeyin.
 ## Kullanım
 
 Panele girin → IPA'yı sürükleyin → süre / not / şifre seçin → çıkan linki paylaşın.
-Alıcı linki iPhone'da **Safari** ile açar; Enterprise imzalı uygulamada ilk açılışta
+Alıcı linki iPhone'da **mobil tarayıcısıyla** (Safari ya da Chrome) açar; Enterprise imzalı uygulamada ilk açılışta
 *Ayarlar › Genel › VPN ve Aygıt Yönetimi*'nden **Güven** demesi gerekir (kurulum sayfası
 bunu anlatır).
 
@@ -239,7 +241,9 @@ dokunduğunuz alanı gönderir. Süre düzenlerken taban seçilir:
 - **Şimdiden** — süresi dolmuş linki yeniden canlandırır.
 
 İptal bundan bağımsızdır: süre düzenlemek iptal edilmiş linki açmaz; **İptal et /
-Yeniden aç** ayrıca yönetilir.
+Yeniden aç** ayrıca yönetilir. Dikkat: iptal edilen linkin dosyası da *Silme gecikmesi*
+(varsayılan 24 saat) sonunda silinir; ondan sonra *Yeniden aç* ve süre düzenleme `409`
+ile reddedilir, panelde Düzenle pasifleşir.
 
 ---
 
@@ -253,7 +257,7 @@ yanlış host'lu manifest cihazda sessizce başarısız olduğu için panelden d
 |---|---|---|
 | Varsayılan link süresi | 24 saat | Yeni linklerin ömrü |
 | En uzun link süresi | 720 saat | Panel tavanı; en fazla 8760 (1 yıl) |
-| Silme gecikmesi | 24 saat | Süresi dolan IPA'nın diskten silinme gecikmesi |
+| Silme gecikmesi | 24 saat | Süresi dolan **veya iptal edilen** IPA'nın diskten silinme gecikmesi; silindikten sonra link yeniden açılamaz |
 | İmzalı link ömrü | 120 dk | manifest/ipa imza geçerliliği (linkin ömründen bağımsız) |
 | En büyük dosya boyutu | 1024 MB | Kabul edilen en büyük IPA |
 | Önceki sürümü otomatik iptal | kapalı | Aynı bundle-id yüklenince eskisini kapatır |
@@ -263,7 +267,10 @@ Link süresi üç kademedir: kod tavanı `MAX_TTL_HOURS = 8760`
 (`backend/src/config/settings.schema.ts`) → panel tavanı *En uzun link süresi* (formdaki
 hazır süre düğmelerini de filtreler) → linkin kendi süresi (yükleme formu). 1 yıllık link
 için önce ayardan 8760, sonra formda **1 yıl**. Süresi dolan link `410` döner; dosyası
-*Silme gecikmesi* kadar sonra silinir, kayıt "purged" olarak kalır.
+*Silme gecikmesi* kadar sonra silinir, kayıt "purged" olarak kalır. **İptal edilen
+link için de aynı saat işler**: iptalden *Silme gecikmesi* kadar sonra dosyası silinir
+ve o andan itibaren *Yeniden aç* / süre düzenleme `409` alır. İptali geçici
+tutacaksanız gecikmeyi ona göre uzun seçin.
 
 ---
 
@@ -283,6 +290,7 @@ npm run build
 # --- terminal 2: arayüz ---
 cd frontend
 npm install
+cp .env.development.local.example .env.development.local   # isteğe bağlı: yerel backend'e bağlan
 npm run dev            # :5173
 npm run typecheck
 npm run build
@@ -298,13 +306,13 @@ Arayüzün bağlandığı API, derleme anındaki `VITE_API_BASE_URL`'den gelir:
 |---|---|---|
 | `frontend/.env.production` | *boş* | göreli yol — üretim SPA'sı aynı origin, CORS'suz |
 | `frontend/.env.development` | `https://ipa-ios.simurgbilisim.com` | dev arayüzü **canlı API'ye** CORS ile bağlanır |
-| `frontend/.env.local` | `http://localhost:3000` | yerel backend ile çalışmak için ezme (şablon: `.env.local.example`) |
+| `frontend/.env.development.local` | `http://localhost:3000` | yerel backend ile çalışmak için ezme (şablon: `.env.development.local.example`; `.env.local` **işe yaramaz** — Vite onu mode dosyasından önce yükler) |
 
 Geliştirme akışı bilinçli olarak cross-origin'dir (karar: 2026-08-10): dev arayüzü kendi
 origin'inde (5173) çalışır ve varsayılan olarak **canlı API'ye** konuşur. Üç uyarı:
 
 - **Dev panelindeki işlemler canlı veriye gider** — yükleme/silme/ayar denemeleri için
-  `frontend/.env.local` ile yerel backend'e dönün.
+  `frontend/.env.development.local` ile yerel backend'e dönün.
 - **Safari üçüncü taraf çerezleri engeller** — dev-arayüz-canlı-API akışı Chrome/Firefox
   içindir.
 - **Port 5173'ü frontend servisi tutuyor olabilir** — dev arayüzünü açmadan önce
@@ -317,6 +325,8 @@ Env kuralları: `dotenv` yoktur, Node'un `--env-file-if-exists` desteği kullan�
 **Sonraki dosya öncekini, gerçek ortam değişkeni hepsini ezer.** Backend dev:
 `.env.development` → `.env.local` → kabuk; container: `.env.production` → `.env.local` →
 kabuk. Sırlar yalnızca `backend/.env.local` (dev) ve `backend/.env` (compose) içindedir.
+Frontend'de sıra Vite'ındır: `.env` → `.env.local` → `.env.[mode]` →
+`.env.[mode].local` (`frontend/src/env-order.test.ts` bunu ölçer).
 
 Her servisin `.env` dosyası **yalnızca kendi** `docker-compose.yml`'ine aittir; `docker
 compose` bulunduğu dizindeki `.env`'i okur, yan klasördekini görmez.
@@ -349,37 +359,51 @@ Kod notları:
 - Yeni backend özelliği = `backend/src/modules/<ad>/` klasörü + `modules/index.ts`
   dizisine bir satır. Rotalar asla `server.ts`'e yazılmaz.
 - `frontend` `backend`'den hiçbir şey import etmez; tek bağ HTTP'dir. DTO tipleri
-  `frontend/src/api.ts` içinde **elle** senkron tutulur (bekçi test: C10).
+  `frontend/src/api.ts` içinde **elle** senkron tutulur; bekçi testler yalnızca alan
+  **adlarını** karşılaştırır (C10: `AppConfig`, C10b: `BuildDto`), tip değişikliğini
+  yakalamaz.
 - Uygulama simgeleri Apple'ın CgBI-PNG varyantından dönüştürülür
   (`backend/src/domain/ipa/cgbi.ts`); dönüşemeyen simge atlanır, kurulum etkilenmez.
 
 ### Testler
 
-Gerçek paket kökteki `tests/` altında çerçevesiz `.mjs` betikleridir (yalnızca Node
-builtin'leri kullanır, kurulum gerektirmez). Tek istisna `frontend`'deki `npm test`
-(vitest): `fetch`'i taklit ederek "backend kapalı / nginx 502 / ağ hatası" gibi backend'in hiç
-göremediği taşıma katmanı hatalarının arayüzde doğru mesaja dönüştüğünü sınar; suite C'nin
-C14 adımı bunu otomatik koşar.
+Gerçek paket kökteki `tests/` altında çerçevesiz `.mjs` betikleridir; kendi `npm install`'ı
+yoktur ama iki yerde servislerin kurulu olmasına yaslanır: F13/F14 test örneğinin SQLite'ını
+`backend/node_modules` içindeki `better-sqlite3` ile açar (backend zaten kurulu olmalı — sunucu
+oradan başlatılır), C14 ise `frontend/node_modules/.bin/vitest`'i çocuk süreç olarak koşar
+(yoksa atlanır). Frontend'in kendi `npm test`'i (vitest) iki dosyadır: `src/api.test.ts`
+`fetch`'i taklit ederek "backend kapalı / nginx 502 / ağ hatası" gibi backend'in hiç
+göremediği taşıma katmanı hatalarının arayüzde doğru mesaja dönüştüğünü sınar;
+`src/env-order.test.ts` Vite'ın `.env` dosya sırasını gerçek `loadEnv` ile ölçer.
 
 ```bash
-node tests/run-suite.mjs A C    # şu an sağlıklı çalışan gruplar
-node tests/run-suite.mjs        # tüm gruplar
+node tests/run-suite.mjs            # tüm gruplar (A, B, C, D)
+node tests/run-suite.mjs A C        # yalnızca seçilen gruplar
+node tests/run-suite.mjs D --domain https://baska.adres
+node tests/run-suite.mjs C --taban http://localhost:3010   # C'nin canlı bloğu için başka backend
 ```
 
-> **⚠️ B ve D grupları servis ayrımından sonra onarım bekliyor (13 Ağustos 2026).**
-> Bu betikler kök `.env` ve kök `docker-compose.yml` dosyalarını okuyacak şekilde
-> yazılmıştı; ikisi de artık yok. Etkilenen yerler: B1, B4, B5 (`readFileSync(KOK/.env)`
-> ve kök `docker compose config`) ve D'nin `PUBLIC_BASE_URL`'i kök `.env`'den okuması.
-> Onarım = bu yolları `backend/.env` ve `backend/docker-compose.yml`'e çevirmek.
-> **A ve C grupları etkilenmedi**: backend'i `cwd: backend/` ile ayrı süreç olarak
-> başlatıp env'i açıkça geçiriyorlar, hiçbir `.env` dosyası okumuyorlar.
->
-> D grubunu bu arada elle hedefleyebilirsiniz:
-> `node tests/run-suite.mjs D --domain https://ipa-ios.simurgbilisim.com`
+Gruplar aynı ölçüde izole **değildir** — koşmadan önce bilin:
 
-Ayrım öncesi son tam koşum: **156/156** (10 Ağustos 2026, aynı gün build edilen
-imajlarla). Senaryo matrisi `tests/TEST-PLAN.md`, kanıt geçmişi
-`tests/BULGULAR-HTTPS.md`, ham raporlar `tests/reports/`.
+| Grup | Ne yapar | Neye dokunur |
+|---|---|---|
+| A | Her senaryo için ayrı bir backend süreci (geçici `DATA_DIR`, boş port; hiçbir `.env` okunmaz) | Hiçbir şeye |
+| B | Sunucu başlatmaz: çalışan backend compose yığınına `docker compose config/exec` (`backend/` dizininden) + `ipa-ota-vartest` adlı geçici compose projesi (:38080) | Yığın kapalıysa ilgili adımlar atlanır; geçici proje sonda silinir |
+| C | C1/C2/C3/C5/C16 **canlı** `--taban` adresine gider (varsayılan `http://localhost:3000` — bu makinede üretim api container'ı; ayakta olmalı). C3b web container'ını (`frontend/.env` `WEB_PORT`) yoklar. D/F/G/H blokları izole sunucuda | Canlı bloğu yalnızca okur |
+| D | `suite-d-https.mjs`: yayındaki HTTPS zincirini hedefler. `backend/.env`'den `PUBLIC_BASE_URL`, `INSTALL_PATH_PREFIX`, `ADMIN_PASSWORD` okur, **canlı panele gerçek şifreyle girer**, üç geçici sürüm yükler (D5.1, D9.2, D10.1), birini iptal eder (D9.4), sonunda hepsini siler (D12.1) | **Üretim verisi** — koşum yarıda kesilirse artık sürümleri panelden silin |
+
+> **Servis ayrımı (13 Ağustos 2026) tüm paketi kırmıştı; 20 Ağustos'ta onarıldı.** B ve D silinen
+> kök `.env` / `docker-compose.yml`'i okuyordu; "A ve C etkilenmedi" iddiası da yanlıştı — C dört
+> yerde kırıktı (C3b kök `.env`, F13/F14 kök `node_modules`'daki `better-sqlite3`, F20 kök
+> `package.json`). İnceleyerek doğrulama kaçırmıştı, koşum saniyeler içinde yakaladı: **testler
+> hakkındaki iddialar koşumdan gelir.** Bugün tüm betikler `backend/.env`,
+> `backend/docker-compose.yml` (proje `ipa-ota-backend`) ve `frontend/.env` / `frontend/` kullanır.
+
+Son tam yeşil koşum: **172/172** (25 Ağustos 2026; A+C 109, B 14, D 49).
+Senaryo matrisi `tests/TEST-PLAN.md` (oradaki "D. Admin Ayarlar" bloğu suite C'nin içindedir;
+`run-suite.mjs D` ise HTTPS grubudur — harf çakışması tarihseldir), kanıt geçmişi
+`tests/BULGULAR-HTTPS.md` (10 Ağustos ve öncesi; oradaki CORS duruşu 20 Ağustos'ta tersine
+döndü), ham raporlar `tests/reports/`.
 
 ---
 

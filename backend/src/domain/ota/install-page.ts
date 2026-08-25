@@ -2,7 +2,7 @@
  * Kurulum sayfasi — son kullanicinin gordugu tek ekran.
  *
  * Sunucu tarafinda uretilir (React degil), cunku:
- *   - iPhone'da Safari ile aninda acilmali, JS paketi beklemeden.
+ *   - iPhone'da mobil tarayicida aninda acilmali, JS paketi beklemeden.
  *   - Kurum aglarinda JS engelli olsa bile kurulum butonu calismali.
  */
 import { escapeHtml, formatBytes, formatDateTime, formatRemaining } from '../../shared/format.ts';
@@ -83,6 +83,9 @@ ol li:last-child { margin-bottom: 0; }
 .notice { border-radius: 12px; padding: 13px 15px; font-size: 14px; margin-top: 18px; }
 .notice.warn { background: var(--warn-bg); color: var(--warn-fg); }
 .notice.err  { background: var(--err-bg);  color: var(--err-fg); }
+/* #masaustu-uyari icindeki adres cubugu "AA" dugmesi taklidi.
+   NOT: bu CSS her sayfaya (iPhone gorunumu dahil) gomulur; buraya tarayici
+   markasi YAZMAYIN — H8 iPhone sayfasinda o marka adinin gecmedigini pinler. */
 .safari-menu-icon {
   display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
   margin-right: 5px; border: 1px solid currentColor; border-radius: 7px; font-size: 12px;
@@ -183,6 +186,10 @@ export function renderInstallPage(input: InstallPageInput): string {
   // sayfaya gizli bir kurulum blogu + kucuk bir dokunmatik tespit betigi konur:
   // Mac'te maxTouchPoints 0'dir, iPad'de > 1. JS kapaliysa sayfa QR gorunumunde
   // kalir (eski davranis); iPhone/iPad UA'lari zaten dogrudan butonu alir.
+  // Tespit BASARISIZ olursa (JS kapali, farkli tarayici) kullanicinin tek yolu
+  // Safari menusunden "Mobil Web Sitesi"ni secmektir — menu etiketi birebir
+  // budur, iPad'de dogrulandi. O yuzden talimat gizli blokta DEGIL, her zaman
+  // gorunen #masaustu-uyari icindedir (2026-08-25).
   if (!input.isIos) {
     const qr = input.showQrCode
       ? `<div class="card qr">
@@ -196,10 +203,6 @@ export function renderInstallPage(input: InstallPageInput): string {
     const ipadKurulum = input.installUrl
       ? `<div id="ipad-kurulum" hidden>
            <a class="btn" href="${escapeHtml(input.installUrl)}">Uygulamayi Yukle</a>
-           <div class="notice warn">
-             Uygulamayı Yükle butonu gözükmüyorsa Safari adres çubuğunun hemen solundaki butona
-             dokunun ve üç noktaya basın ardından <strong>Mobil Web Sitesi</strong>'ni seçin.
-           </div>
          </div>
          <script>
          (function () {
@@ -222,7 +225,11 @@ export function renderInstallPage(input: InstallPageInput): string {
        ${ipadKurulum}
        <div class="notice warn" id="masaustu-uyari">
          Bu uygulama yalnizca <strong>iPhone ve iPad</strong> cihazlara kurulabilir.
-         Kurulum icin bu sayfayi iOS cihazinizda <strong>Safari</strong> ile acin.
+         Kurulum icin bu sayfayi iOS cihazinizdaki <strong>mobil tarayicinizda</strong> acin.
+         <br><br>
+         Eger tarayiciniz Safari ise ve <strong>Uygulamayi Yukle</strong> butonu gozukmuyorsa,
+         adres cubugunun hemen solundaki <span class="safari-menu-icon" aria-hidden="true">AA</span>
+         dugmesine dokunun, uc noktaya basin ve <strong>Mobil Web Sitesi</strong>'ni secin.
        </div>
        ${qr}
        ${detaylar}
@@ -263,7 +270,8 @@ export function renderInstallPage(input: InstallPageInput): string {
 
      <div class="notice warn">
        Kurulum sirasinda cihazin internete bagli kalmasi gerekir.
-       Sayfa Safari disinda bir tarayicida acildiysa kurulum baslamayabilir.
+       Sayfa mobil tarayiciniz disinda (orn. WhatsApp ya da Instagram icinde) acildiysa
+       kurulum baslamayabilir; bu durumda linki mobil tarayicinizda acin.
      </div>
 
      <div class="foot">${escapeHtml(siteName)}</div>`,

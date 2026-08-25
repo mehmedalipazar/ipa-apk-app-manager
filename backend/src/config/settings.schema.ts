@@ -40,7 +40,7 @@ export const AppConfigSchema = z.object({
   /** Kabul edilen en buyuk IPA boyutu (MB). */
   maxUploadMb: z.number().int().min(1).max(8192).default(1024),
 
-  /** Suresi dolan linklerin dosyalari kac saat sonra diskten silinsin? */
+  /** Suresi dolan YA DA iptal edilen linklerin dosyalari kac saat sonra diskten silinsin? Silindikten sonra link yeniden acilamaz / uzatilamaz (409). */
   purgeAfterExpiryHours: z.number().int().min(0).max(MAX_TTL_HOURS).default(24),
 
   /** Kurulum sayfasinda gosterilen baslik. */
@@ -140,7 +140,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'purgeAfterExpiryHours',
     label: 'Silme gecikmesi',
-    help: 'Suresi dolan linklerin IPA dosyalari bu sure sonunda diskten silinir. 0 = hemen sil.',
+    help: 'Suresi dolan ya da iptal edilen linklerin IPA dosyalari bu sure sonunda diskten silinir; sonrasinda link yeniden acilamaz. 0 = hemen sil.',
     kind: 'number',
     unit: 'saat',
     min: 0,

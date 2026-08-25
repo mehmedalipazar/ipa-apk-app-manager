@@ -386,9 +386,11 @@ function BakimKarti() {
       </div>
       <div className="card-body">
         <p style={{ color: 'var(--fg-muted)', fontSize: 14, marginBottom: 13 }}>
-          Suresi dolmus surumlerin IPA dosyalari normalde arka planda silinir. Diski hemen
-          bosaltmak icin temizligi elle calistirabilirsiniz. Kayitlar silinmez, yalnizca
-          dosyalar kaldirilir; link 410 doner.
+          Suresi dolmus ya da iptal edilmis surumlerin IPA dosyalari, ayarlardaki
+          "Silme gecikmesi" kadar sonra arka planda silinir. Diski hemen bosaltmak
+          icin temizligi elle calistirabilirsiniz. Kayitlar silinmez, yalnizca
+          dosyalar kaldirilir; link 410 doner ve surum bir daha yeniden
+          acilamaz / suresi uzatilamaz.
         </p>
 
         <p style={{ fontSize: 14, marginBottom: 13 }}>

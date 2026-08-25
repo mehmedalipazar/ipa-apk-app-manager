@@ -3,7 +3,9 @@
  *
  * Sunucu ile arayuz arasindaki sozlesme burasidir; `frontend/src/api.ts`
  * icindeki tip bunun aynasidir ve ELLE senkron tutulur. Bu dosyayi
- * degistirirseniz orayi da guncelleyin — hicbir arac bu kaymayi yakalamaz.
+ * degistirirseniz orayi da guncelleyin — derleyici bu kaymayi yakalamaz;
+ * tests/suite-c-api.mjs C10b iki dosyadaki alan ADLARINI karsilastirir
+ * (tipleri degil).
  */
 import type { BuildRecord } from '../../db/repositories/builds.repository.ts';
 import type { LinkService } from '../../domain/links/service.ts';

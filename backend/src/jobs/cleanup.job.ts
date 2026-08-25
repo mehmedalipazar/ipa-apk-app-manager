@@ -1,9 +1,14 @@
 /**
- * Suresi dolan linklerin dosyalarini diskten siler.
+ * Suresi dolan YA DA iptal edilen linklerin dosyalarini diskten siler.
+ *
+ * Aday secimi `BuildsRepository.findPurgeable()`: `expires_at` veya
+ * `revoked_at` su andan `purgeAfterExpiryHours` kadar eskiyse. Acilista bir
+ * kez, sonra 15 dakikada bir calisir (`start()`).
  *
  * Kayit satiri SILINMEZ — istatistik ve denetim icin kalir; yalnizca
  * `files_deleted_at` isaretlenir. Boylece surum panelde "dosyalari silindi"
- * olarak gorunur, link ise kaybolmak yerine 410 doner.
+ * olarak gorunur, link ise kaybolmak yerine 410 doner. Dosyasi silinen surum
+ * bir daha yeniden acilamaz / uzatilamaz (unrevoke/extend -> 409).
  */
 import type { BuildsRepository } from '../db/repositories/builds.repository.ts';
 import type { Storage } from '../domain/storage/types.ts';

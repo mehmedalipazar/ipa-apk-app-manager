@@ -1,5 +1,15 @@
 # Uctan Uca Test — Bulgular
 
+> **TARIHSEL KAYIT — 2026-08-05 kosumu, v1 agaci.** Bu dosya o gunku yapiyi anlatir:
+> `server/` + `web/` klasorleri, kok `.env` / `docker-compose.yml`, `caddy` profili, o gunun
+> grup harfleri ve CORS/cerez durusu. 2026-08-07'de v2'ye (`backend/` + `frontend/`),
+> 2026-08-13'te tam servis ayrimina gecildi; buradaki dosya yollari ve satir numaralari
+> artik gecerli degildir. Guncel gercek: `CLAUDE.md` + `tests/TEST-PLAN.md`; kanit gecmisi
+> `tests/BULGULAR-HTTPS.md`. DIKKAT: bugun `node tests/run-suite.mjs D` asagidaki
+> "D — Ayar alanlari" degil, `suite-d-https.mjs`tir — yayindaki domain'e gercek admin
+> sifresiyle girer, gecici surumler yukler ve siler (URETIME dokunur). Asagidaki "D" grubu
+> bugun suite C'nin icinde (`D — Ayar alanlari`) yasar.
+
 Kosum tarihi: 2026-08-05
 Kapsam: 103 otomatik test (A/B/C/D/F/G) + 38 tarayici senaryosu (E + UI akislari)
 Arac: Node test kosucusu (`tests/run-suite.mjs`) + Chrome DevTools MCP
@@ -9,7 +19,7 @@ Arac: Node test kosucusu (`tests/run-suite.mjs`) + Chrome DevTools MCP
 | A | Ortam degiskeni okuma | 22 / 22 ✅ |
 | B | Docker Compose degisken aktarimi | 11 / 14 (3 gercek hata) |
 | C | Backend ↔ Frontend haberlesme | 11 / 11 ✅ |
-| D | Ayar alanlari (10 alan) | 18 / 18 ✅ |
+| D | Ayar alanlari (10 alan) — *o gunun D'si; bugun suite C icinde, bugunku `D` = canli HTTPS suiti* | 18 / 18 ✅ |
 | F | Uctan uca OTA akisi | 27 / 27 ✅ |
 | G | Kimlik dogrulama | 11 / 11 ✅ |
 | E | "Kaydet" senaryolari (tarayici) | 20 / 20 ✅ |
@@ -32,7 +42,7 @@ izole sunucu ornekleriyle davranissal olarak dogrulandi:
 | `LOG_LEVEL` | `debug`=1160 B cikti, `fatal`=0 B |
 | `TRUST_PROXY` | `true` iken `X-Forwarded-For` IP'si loglaniyor, `false` iken hayir |
 | `PUBLIC_BASE_URL` | Temiz DB'de `config.baseUrl`a geciyor; sondaki `/` kirpiliyor |
-| `ADMIN_PASSWORD` | Ilk aciliste giris saglıyor; sonraki aciliste yok sayiliyor |
+| `ADMIN_PASSWORD` | Ilk aciliste giris sagliyor; sonraki aciliste yok sayiliyor |
 | `ADMIN_PASSWORD_FORCE_RESET` | `true` ile env sifresi DB'yi eziyor |
 | `SESSION_SECRET` | Degisince oturumlar dusuyor, imzali linkler 403 |
 | `NODE_ENV` | prod=JSON log + zorunlu sir kontrolu, dev=pretty + gecici anahtar |
@@ -267,15 +277,20 @@ Ayni kural `ADMIN_PASSWORD` icin de gecerli (A11) — orada acikca belgelenmis.
 
 ---
 
-## Test verisi ve ortam
+## Test verisi ve ortam (2026-08-05 itibariyla)
 
 Tum tarayici testleri kullanicinin gelistirme veritabani uzerinde calisti;
 **baslangic ayarlari ve yonetici sifresi test sonunda geri yuklendi**, olusturulan
-test surumu silindi (`0 surum` dogrulandi). A/B/C/D/F/G gruplari izole sunucu
-ornekleri ve gecici dizinlerde calisir, kullanicinin verisine dokunmaz.
+test surumu silindi (`0 surum` dogrulandi). O gunku A/B/C/D/F/G gruplari izole sunucu
+ornekleri ve gecici dizinlerde calisti, kullanicinin verisine dokunmadi.
 
-Kosum:
+> Bugun (2026-08-25) bu cumle oldugu gibi dogru DEGILDIR: yalnizca A ile C'nin D/F/G/H
+> bloklari izoledir; C1-C16 canli `:3000`'e gider, B calisan compose yiginini surer,
+> `D` ise yayindaki domain'e gercek sifreyle girip surum yukler/siler. Ayrintisi
+> `CLAUDE.md` ("Tests") ve `tests/run-suite.mjs` basligindadir.
+
+Kosum (o gunku komutlar; sozdizimi bugun de ayni, gruplarin anlami yukaridaki gibi degisti):
 ```bash
-node tests/run-suite.mjs          # tum gruplar
-node tests/run-suite.mjs A B      # secili gruplar
+node tests/run-suite.mjs          # tum gruplar (A, B, C, D)
+node tests/run-suite.mjs A C      # secili gruplar
 ```

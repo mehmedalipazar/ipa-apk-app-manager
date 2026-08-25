@@ -264,8 +264,10 @@ export class BuildsRepository {
   }
 
   /**
-   * Suresi `cutoff` degerinden once dolmus ve dosyalari henuz silinmemis
-   * kayitlari dondurur.
+   * Dosyalari henuz silinmemis ve `cutoff` degerinden once SURESI DOLMUS
+   * ya da IPTAL EDILMIS (`revoked_at <= cutoff`) kayitlari dondurur.
+   * Iptal de temizlik saatini baslatir: gecikme sonunda dosya gider ve
+   * unrevoke/extend 409 verir — bkz. jobs/cleanup.job.ts.
    */
   findPurgeable(cutoff: number): BuildRecord[] {
     const rows = this.db

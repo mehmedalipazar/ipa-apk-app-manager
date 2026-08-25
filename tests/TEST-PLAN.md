@@ -7,46 +7,56 @@ backend↔frontend haberlesme sozlesmesi, admin ayarlar panelinin her alani ve
 ## 0. Sistem haritasi — degisken nereden nereye akar
 
 ```
-                    ONCELIK:  veritabani  >  ortam degiskeni  >  sema varsayilani
-                              (settings)     (.env/.env.local)   (config/schema.ts)
+                 ONCELIK:  veritabani  >  ortam degiskeni  >  sema varsayilani
+                           (settings)     (.env.* dosyalari)  (config/settings.schema.ts)
+                           TEK ISTISNA baseUrl: ortam degiskeni > DB (asagida)
 
-  .env ──┐
-         ├─→ node --env-file-if-exists ──→ process.env ──→ env.ts (zod) ──→ env objesi
-  .env.local ─┘        (server/package.json dev|start)          │
-         │                                                       ├─→ PORT/HOST     → app.listen()
-  shell ─┘  (en yuksek oncelik)                                  ├─→ DATA_DIR      → storage/local.ts
-                                                                 ├─→ LOG_LEVEL     → Fastify logger
-  docker-compose.yml `environment:` ──→ container env            ├─→ TRUST_PROXY   → Fastify trustProxy
-         ${VAR} host .env dosyasindan cozulur                    ├─→ SESSION_SECRET→ oturum + imzali URL HMAC
-                                                                 ├─→ ADMIN_PASSWORD→ auth.bootstrap (SADECE ilk acilis)
-                                                                 └─→ PUBLIC_BASE_URL → ConfigService.load()
-                                                                        │  (SADECE DB'de config.baseUrl yoksa)
-                                                                        ▼
-                                                             settings tablosu (config.*)
-                                                                        │
-                                              GET /api/settings  {values, fields, warnings}
-                                                                        ▼
-                                                    web/src/pages/SettingsPage.tsx
-                                                    (alanlar `fields`den uretilir)
-                                                                        │
-                                              PUT /api/settings  (tum values govdede)
-                                                                        ▼
-                                                    ConfigService.update() → cache + DB
+  --- BACKEND (Node; dotenv yok, backend/package.json --env-file-if-exists zinciri) ---
+  .env.development (dev) | .env.production (prod, imaja gomulu)  ─┐
+  .env.local  (sirlar, gitignore)                                  ├─→ process.env ─→ config/env.ts (zod) ─→ env
+  kabuk / compose `environment:`  (en yuksek oncelik)             ─┘         │
+      ${VAR} degerleri backend/.env'den cozulur; o dosyayi YALNIZCA          ├─→ PORT/HOST            → app.listen()
+      docker compose okur, Node hic okumaz                                    ├─→ DATA_DIR             → db/client.ts, storage/local.ts
+                                                                              ├─→ LOG_LEVEL            → Fastify logger
+                                                                              ├─→ TRUST_PROXY          → Fastify trustProxy
+                                                                              ├─→ CORS_ORIGINS         → server.ts (cors + Origin kapisi), cerez SameSite
+                                                                              ├─→ INSTALL_PATH_PREFIX  → kurulum rotalari + uretilen linkler
+                                                                              ├─→ SESSION_SECRET       → oturum cerezi + imzali URL HMAC
+                                                                              ├─→ ADMIN_PASSWORD       → auth.bootstrap (SADECE ilk acilis / FORCE_RESET)
+                                                                              └─→ PUBLIC_BASE_URL      → ConfigService.load()
+                                                                                     │ (bos degilse DB'deki degeri HER ACILISTA EZER; DB'ye hic yazilmaz)
+                                                                                     ▼
+                                                                          settings tablosu (config.*)
+                                                                                     │
+                                                          GET /api/settings  {values, fields, warnings}
+                                                                                     ▼
+                                                            frontend/src/pages/SettingsPage.tsx
+                                                            (alanlar `fields`ten uretilir; baseUrl fields'ta YOK)
+                                                                                     │
+                                                          PUT /api/settings  (tum values govdede; baseUrl sema tarafindan ATILIR)
+                                                                                     ▼
+                                                            ConfigService.update() → cache + DB
+
+  --- FRONTEND (Vite; derleme zamani, yalnizca VITE_ onekli anahtarlar pakete girer) ---
+  .env → .env.local → .env.[mode] → .env.[mode].local ─→ import.meta.env.VITE_API_BASE_URL ─→ src/api.ts API_BASE
+      uretim: bos = goreli /api yolu | dev: canli API | makineye ozel ezme: .env.development.local
 ```
 
 Kritik davranis kurallari (testler bunlari dogrular):
 
 | Kural | Kaynak |
 |---|---|
-| `PUBLIC_BASE_URL` yalnizca DB'de `config.baseUrl` **yokken** okunur | `config/service.ts:32` |
-| `ADMIN_PASSWORD` yalnizca DB'de hash **yokken** (veya FORCE_RESET) okunur | `auth/service.ts:36` |
-| `SESSION_SECRET` degisirse tum oturumlar + imzali linkler gecersiz olur | `links/token.ts`, `auth/session.ts` |
-| `NODE_ENV=production` iken `SESSION_SECRET`/`ADMIN_PASSWORD` zorunlu | `env.ts:49`, `auth/service.ts:39` |
-| Ayarlar bellekte cache'lenir; `update()` disinda tazelenmez | `config/service.ts:21` |
-| Frontend tipleri (`web/src/api.ts`) sunucu semasiyla **elle** senkronlanir | `web/src/api.ts:5` |
-| Proxy YOK: dev'de de arayuz (5173) → API (3000) cross-origin gider | `web/vite.config.ts` |
-| API adresi calisma aninda `public/config.js`ten okunur, pakete gomulmez | `web/src/api.ts:26` |
-| Kimlik: `credentials: 'include'` cerez; OTA indirmeleri **imzali URL** | `web/src/api.ts`, `links/token.ts:1` |
+| `PUBLIC_BASE_URL` bos degilse DB'deki `config.baseUrl`i **her aciliste ezer**; DB'ye hic yazilmaz (panelin PUT'undaki baseUrl sema tarafindan atilir) | `backend/src/config/settings.service.ts` (`load()` / `update()`), `settings.schema.ts` (`AppConfigUpdateSchema.omit({ baseUrl })`) |
+| `ADMIN_PASSWORD` yalnizca DB'de hash **yokken** (veya `ADMIN_PASSWORD_FORCE_RESET=true`) okunur | `backend/src/modules/auth/auth.service.ts` (`bootstrap()`) |
+| `SESSION_SECRET` degisirse tum oturumlar + imzali linkler gecersiz olur; sifre degisimi de oturumlari dusurur (cerez `SESSION_SECRET + sifre hash'i` ile imzalanir) ama linkleri DUSURMEZ | `backend/src/domain/links/token.ts`, `backend/src/modules/auth/session.ts` |
+| `NODE_ENV=production` iken `SESSION_SECRET` zorunlu, `ADMIN_PASSWORD` en az 8 karakter; her yapilandirma hatasi `Yapilandirma hatasi: ...` + exit 1, stack trace yok | `backend/src/config/env.ts` (`yukleYaDaCik()`), `auth.service.ts`, `backend/src/index.ts` |
+| Ayarlar bellekte cache'lenir; `update()` disinda tazelenmez | `backend/src/config/settings.service.ts` |
+| Frontend tipleri (`frontend/src/api.ts`) sunucu semasiyla **elle** senkronlanir; C10/C10b yalnizca alan ADLARINI karsilastirir | `frontend/src/api.ts:1-7`, `backend/src/modules/builds/build.dto.ts` |
+| Proxy YOK (depoda): dev'de arayuz (5173) → API cross-origin gider; uretimde ayrimi ONDEKI ters proxy yapar (`/api/*` → api) | `frontend/vite.config.ts`, `frontend/nginx.conf` |
+| API adresi **derleme aninda** `VITE_API_BASE_URL` ile gomulur (uretim: bos = goreli yol); calisma zamani `config.js` mekanizmasi KALDIRILDI (C3b, D2.4 geri gelmedigini savunur) | `frontend/src/api.ts` (`API_BASE`), `frontend/.env.production` |
+| Vite dosya sirasi `.env` → `.env.local` → `.env.[mode]` → `.env.[mode].local`; `.env.local` mode dosyasini EZEMEZ, makineye ozel ezme `.env.development.local` | `frontend/src/env-order.test.ts` |
+| Kimlik: `credentials: 'include'` cerez (`SameSite=None; Secure` — CORS acik); OTA indirmeleri **imzali URL**, cerez degil | `frontend/src/api.ts` (`request()`), `backend/src/domain/links/token.ts` |
+| `CORS_ORIGINS` doluyken durum degistiren isteklerde yabanci `Origin` 403 (CSRF kapisi) | `backend/src/server.ts` |
 
 ---
 
@@ -57,19 +67,19 @@ uzerinden kanitlamak. "Deger set edildi" yeterli degil — davranis degismeli.
 
 | # | Senaryo | Yontem | Beklenen |
 |---|---|---|---|
-| A1 | Yukleme sirasi `.env` → `.env.local` → shell | Ayni anahtari uc yerde farkli deger yap, sunucuyu baslat | Shell kazanir; `.env.local` `.env`i ezer |
+| A1 | Yukleme sirasi (Node `--env-file-if-exists`): mode dosyasi → `.env.local` → shell | Ayni anahtari uc yerde farkli deger yap; `backend/package.json` dev/start scriptlerinde `.env.local`in mode dosyasindan SONRA geldigini de kontrol et | Shell kazanir; `.env.local` mode dosyasini ezer |
 | A2 | `PORT` okunuyor mu | `PORT=3999` ile baslat | `:3999/healthz` 200, `:3000` kapali |
 | A3 | `HOST` okunuyor mu | `HOST=127.0.0.1` | Yalnizca loopback'te dinler |
 | A4 | `DATA_DIR` okunuyor mu | `DATA_DIR=./tmp-veri` | O dizinde `ipa-ota.db` + `uploads/` olusur |
 | A5 | `LOG_LEVEL` okunuyor mu | `LOG_LEVEL=fatal` vs `debug` | debug'da istek loglari cikar, fatal'de cikmaz |
 | A6 | `TRUST_PROXY` okunuyor mu | `true`/`false` + `X-Forwarded-For` gonder | true iken log'daki `remoteAddress`/`req.ip` basliktaki IP olur |
 | A7 | `PUBLIC_BASE_URL` **DB bosken** okunuyor mu | Temiz DB + `PUBLIC_BASE_URL=https://a.test` | `GET /api/settings.values.baseUrl == https://a.test` |
-| A8 | `PUBLIC_BASE_URL` **DB doluyken yok sayiliyor mu** | DB'de baseUrl varken env'i degistir + restart | DB degeri korunur (bilincli davranis) |
+| A8 | `PUBLIC_BASE_URL` **DB doluyken de kazaniyor mu** | Panelden baseUrl PUT et (yok sayilmali) → env'i degistir + restart | Env degeri gecerli, panel PUT'u etkisiz (bilincli asimetri: env > DB, DB'ye yazilmaz) |
 | A9 | `PUBLIC_BASE_URL` sondaki `/` kirpiliyor mu | `https://a.test///` | `https://a.test` olarak kaydedilir |
 | A10 | `ADMIN_PASSWORD` ilk acilista okunuyor mu | Temiz DB + sifre | O sifreyle giris yapilir |
 | A11 | `ADMIN_PASSWORD` sonraki aciliste yok sayiliyor mu | Sifreyi degistir, env'i eski birak, restart | Yeni sifre gecerli kalir |
 | A12 | `ADMIN_PASSWORD_FORCE_RESET=true` | Restart | Env'deki sifre DB'yi ezer |
-| A13 | `ADMIN_PASSWORD` < 12 karakter (prod) | Temiz DB, kisa sifre | Acilista `AuthError`, exit 1 |
+| A13 | `ADMIN_PASSWORD` < 8 karakter (prod; `MIN_PASSWORD_LENGTH`) | Temiz DB, kisa sifre | Acilista `AuthError`, exit 1 |
 | A14 | `SESSION_SECRET` degisimi oturumu dusurur mu | Giris yap → secret degistir → restart → `/api/auth/me` | `authenticated:false` |
 | A15 | `SESSION_SECRET` degisimi imzali linki bozar mi | Link uret → secret degistir → restart → manifest cek | 403 |
 | A16 | `SESSION_SECRET` yokken prod | `NODE_ENV=production`, secret bos | Acilista hata, exit 1 |
@@ -101,7 +111,7 @@ yok. Oncesinde `SESSION_SECRET`/zod/`DATA_DIR` hatalari dogru mesaji stack trace
 | B5 | Compose'da sabitlenen degerler ezilemez mi | `.env`de `NODE_ENV=development` yaz | Container'da yine `production` (compose sabit) |
 | B6 | `.env` degisikligi restart olmadan etkisiz | Degistir, restart yok | Eski deger gecerli |
 | B7 | `.env` degisikligi `up -d` sonrasi etkili | `docker compose up -d` | Yeni deger container'da |
-| B8 | `PUBLIC_BASE_URL` degisimi + dolu DB | B7 sonrasi | DB kazanir (A8 ile ayni kural, container'da) |
+| B8 | `PUBLIC_BASE_URL` degisimi + dolu DB | B7 sonrasi | Env kazanir: panelden hic kaydedilmemisken her aciliste env okunur (B8); panelden kaydetmek de golgeleyemez, yeniden olusturmada env yine kazanir (B8b) |
 | B9 | Port host'a yayinlaniyor mu | `docker compose ps` | `0.0.0.0:3000->3000/tcp` gorunur |
 | B10 | Yayinlanan porttan erisim | `curl localhost:$HOST_PORT/healthz` | 200 doner |
 | B11 | Volume kaliciligi | `down` → `up` (volume silmeden) | DB ve IPA'lar korunur |
@@ -114,14 +124,15 @@ yok. Oncesinde `SESSION_SECRET`/zod/`DATA_DIR` hatalari dogru mesaji stack trace
 | C1 | `/api/auth/me` sozlesmesi | Arka uca dogrudan istek | 200 + JSON |
 | C2 | `/i` ve `/healthz` | Arka uca dogrudan istek | HTML / 200 |
 | C3 | Arka uc statik dosya sunmuyor | API'ye `/admin/*` iste | JSON 404 (SPA fallback yok) |
-| C3b | Arayuz servisi SPA fallback | web servisine `/admin/*` iste | `index.html` + `/config.js` doner |
-| C4 | Uretimde SPA fallback | `/admin/ayarlar` derin link | `index.html` doner (`app.ts:65`) |
+| C3b | Arayuz servisi SPA fallback | web servisine (`frontend/.env` WEB_PORT) `/admin/*` iste | `index.html` doner ve icinde `/config.js` referansi YOK (kaldirilan mekanizma geri gelmemis) |
+| C4 | Uretimde SPA fallback | `/admin/ayarlar` derin link | `index.html` doner (`frontend/nginx.conf` `try_files ... /index.html`) |
 | C5 | `/api/*` 404 JSON doner | Olmayan API yolu | `{"error":"Bulunamadi"}`, HTML degil |
-| C6 | Oturum cerezi gonderiliyor mu | `credentials: 'same-origin'` | Istek basliginda `Cookie:` var |
+| C6 | Oturum cerezi gonderiliyor mu | `credentials: 'include'` | Istek basliginda `Cookie:` var (cross-origin dev akisinda da) |
 | C7 | 401 akisi | Cerezi sil → `/api/settings` | 401 + arayuz giris ekranina duser |
 | C8 | Hata mesaji ustten alta tasiniyor mu | Gecersiz ayar PUT et | Sunucu mesaji arayuzde birebir gorunur |
-| C9 | `fields` sozlesmesi | `GET /api/settings` | 10 alan; her biri panelde render edilir |
-| C10 | DTO drift | `api.ts` AppConfig ↔ sunucu semasi | Alan adlari/sayisi birebir |
+| C9 | `fields` sozlesmesi | `GET /api/settings` | `values` 10 alan, `fields` 9 tanim (baseUrl cizilmez — C9b); her biri panelde render edilir |
+| C10 | DTO drift (AppConfig) | `api.ts` AppConfig ↔ `BEKLENEN_ALANLAR` | Alan adlari/sayisi birebir (tipler degil) |
+| C10b | DTO drift (BuildDto) | `build.dto.ts` ↔ `api.ts` `export interface BuildDto` bloklari, ayni regex | Alan adi kumeleri birebir (sira onemsiz; eksik/fazla iki yonde raporlanir) |
 | C11 | XHR yukleme ilerlemesi | Buyuk dosya yukle | `progress` olaylari, yuzde artar |
 | C12 | Yukleme iptali | Iptal dugmesi | `abort` → 'Yukleme iptal edildi' |
 | C13 | `warnings` dizisi tasinmasi | baseUrl'i http yap | Uyari hem settings hem upload yanitinda |
@@ -130,6 +141,11 @@ yok. Oncesinde `SESSION_SECRET`/zod/`DATA_DIR` hatalari dogru mesaji stack trace
 | C16 | Onbellek disi kurulum sayfasi | `/i/:token` | `cache-control: no-store` |
 
 ## D. Admin Ayarlar — her alan
+
+> ID cakismasi (tarihsel, yeniden adlandirilmadi): bu plan-D'si suite C icindeki
+> `D — Ayar alanlari` blogudur (izole sunucu). `node tests/run-suite.mjs D` ise
+> `suite-d-https.mjs` — yayindaki HTTPS zinciri, canli panele gercek sifreyle girer,
+> surum yukler/siler.
 
 Her alan icin: **gecerli deger**, **sinir alti**, **sinir ustu**, **kalicilik (F5)**,
 **davranissal etki** (ayarin gercekten bir seyi degistirdigi kanit).
@@ -222,10 +238,11 @@ Her alan icin: **gecerli deger**, **sinir alti**, **sinir ustu**, **kalicilik (F
 
 ```bash
 # Otomatik API + env + docker suiti
-node tests/run-suite.mjs                 # arka uc 3000, arayuz 5173
-node tests/run-suite.mjs A C             # izole sunucu gruplari (C14 frontend vitest'ini de kosar)
+node tests/run-suite.mjs                 # A, B, C, D — C'nin canli blogu :3000'e, D yayindaki domain'e gider (URETIM)
+node tests/run-suite.mjs A C             # A ve C'nin D/F/G/H bloklari izole sunucu; C1-C16 canli --taban (varsayilan :3000; C14 frontend vitest'ini de kosar)
+node tests/run-suite.mjs C --taban http://localhost:3010   # canli blok icin baska bir backend (5173 degil — o nginx'tir)
 
-# Yalnizca frontend tasima katmani (fetch taklidi, ~150 ms)
+# Yalnizca frontend (fetch taklidi + Vite .env sirasi, < 1 sn)
 cd frontend && npm test
 
 # Tarayici (Chrome DevTools MCP) senaryolari: C, D, E, F gorsel adimlari

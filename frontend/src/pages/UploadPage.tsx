@@ -117,7 +117,7 @@ export function UploadPage() {
       <div className="main narrow">
         <div className="page-head">
           <h1>Link hazir</h1>
-          <p>Bu adresi paylasin; alici iPhone'da Safari ile acip tek dokunusla kursun.</p>
+          <p>Bu adresi paylasin; alici iPhone'da mobil tarayicisiyla acip tek dokunusla kursun.</p>
         </div>
 
         <AlertList warnings={uyarilar} />
@@ -159,7 +159,7 @@ export function UploadPage() {
                     <div className="qr-text">
                       <strong style={{ color: 'var(--fg)' }}>Telefonla okutun</strong>
                       <br />
-                      iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa Safari'de
+                      iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda
                       acilir ve kurulum baslar.
                     </div>
                   </div>

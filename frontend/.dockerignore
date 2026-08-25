@@ -8,6 +8,9 @@ dist
 # .env.production yeterlidir ve o BILEREK imaja girer (sir icermez).
 .env
 .env.local
+# .env.production.local da disarida: `vite build` (mode=production) onu YUKLER ve
+# VITE_API_BASE_URL'i imaja gomerdi.
+.env.*.local
 .env.development
 
 *.log

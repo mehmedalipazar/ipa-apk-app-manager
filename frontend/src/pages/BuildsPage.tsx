@@ -227,7 +227,7 @@ export function BuildsPage() {
                 <div className="qr-panel" style={{ marginTop: 13 }}>
                   <img src={build.qrUrl} alt={`${build.appName} kurulum linki QR kodu`} />
                   <div className="qr-text">
-                    iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa Safari'de
+                    iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda
                     acilir ve kurulum tek dokunusla baslar.
                   </div>
                 </div>

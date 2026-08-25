@@ -2,13 +2,21 @@
 /**
  * Uctan uca test kosucusu.
  *
- *   node tests/run-suite.mjs              # tum gruplar
+ *   node tests/run-suite.mjs              # tum gruplar (A, B, C, D)
  *   node tests/run-suite.mjs A B          # yalnizca secilen gruplar
- *   node tests/run-suite.mjs --taban http://localhost:5173   # baska bir ornegi hedefle
+ *   node tests/run-suite.mjs C --taban http://localhost:3010   # C'nin canli blogu icin baska bir BACKEND
  *
- * Grup D digerlerinden ayridir: izole sunucu baslatmaz, yayindaki HTTPS
- * adresini hedefler. Adresi `backend/.env`deki PUBLIC_BASE_URL'den okur; `--domain`
- * ile ezilebilir.
+ * Hangi grup neyi hedefler (esit olcude izole DEGILLER):
+ *   A — her senaryo icin izole backend process'i (gecici DATA_DIR, bos port; .env okunmaz)
+ *   B — sunucu baslatmaz: calisan backend compose yigini (`docker compose config/exec`,
+ *       backend/ dizininden) + `ipa-ota-vartest` adli gecici compose projesi (:38080)
+ *   C — C1/C2/C3/C5/C16 CANLI `--taban` ornegine gider (varsayilan http://localhost:3000;
+ *       bu Mac'te o adres URETIM api container'idir, ayakta olmali). C3b web container'ini
+ *       (frontend/.env WEB_PORT, varsayilan 5173) yoklar. D/F/G/H bloklari izole sunucu.
+ *       `--taban` yalnizca canli blogu etkiler; 5173 VERILMEZ (o nginx'tir, C1 duser).
+ *   D — izole sunucu baslatmaz, yayindaki HTTPS adresini hedefler: canli panele
+ *       backend/.env'deki ADMIN_PASSWORD ile girer, gecici surumler yukler ve siler
+ *       (URETIME DOKUNUR). Adresi backend/.env PUBLIC_BASE_URL'den okur; `--domain` ezer.
  *
  *   node tests/run-suite.mjs D
  *   node tests/run-suite.mjs D --domain https://baska.adres

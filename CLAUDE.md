@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Self-hosted iOS OTA (over-the-air) IPA distribution service. Admin uploads an `.ipa`, gets a
-time-limited shareable link; the recipient opens it in Safari on an iPhone and installs in one tap.
+time-limited shareable link; the recipient opens it in a mobile browser (Safari or Chrome) on an
+iPhone and installs in one tap.
 
 **Two fully independent services in one repo** (restructured 2026-08-13): `backend` (Fastify API)
 and `frontend` (React SPA). There is **no root-level build structure** — no root `package.json`, no
@@ -59,24 +60,31 @@ cross-cutting harness, not a workspace). It needs no `npm install` of its own: a
 Node builtins. The one exception is two suite-C cases (F13/F14) that open the test instance's
 SQLite directly — they resolve `better-sqlite3` out of `backend/node_modules` via
 `createRequire(backend/package.json)`, so the backend must be installed (it must be anyway to spawn
-the server under test).
+the server under test). C14 additionally needs `frontend/node_modules/.bin/vitest` (skips
+otherwise).
 
-- Groups A (env-var reading), B (docker compose var passthrough), C (API contract) spawn **isolated
-  backend instances on free ports with temp data dirs** (`tests/lib/harness.mjs`). The harness
-  spawns `backend/src/index.ts` with `cwd: backend/` and passes env explicitly — it reads **no**
-  `.env` files, so it resolves `backend/node_modules` and is unaffected by the split.
+- Group A (env-var reading) and the D/F/G/H blocks of group C spawn **isolated backend instances on
+  free ports with temp data dirs** (`tests/lib/harness.mjs` spawns `backend/src/index.ts` with
+  `cwd: backend/`, passes env explicitly and reads **no** `.env` files). Two things are *not*
+  isolated: group C's opening block (C1/C2/C3/C5/C16, plus C3b which reads `WEB_PORT` from
+  `frontend/.env` and probes the web container) hits the **live** `--taban` target, default
+  `http://localhost:3000` — on this Mac that is the production api container, so it must be up
+  (`--taban http://localhost:3010` to point it at a dev backend; never 5173, that is nginx); and
+  group B spawns no server at all — it drives `docker compose config`/`exec` against the running
+  backend stack plus a throwaway compose project `ipa-ota-vartest` on port 38080.
 - Group B additionally exercises the running `docker compose` stack; bring it up first or those
   cases skip.
 - Group D targets the real deployed HTTPS chain. `suite-d-https.mjs` reads `PUBLIC_BASE_URL`,
   `INSTALL_PATH_PREFIX` and `ADMIN_PASSWORD` from **`backend/.env`** (the compose secrets file) —
   it logs into the live panel and uploads/removes throwaway builds, so treat a D run as touching
   production.
-- **Frontend has one real unit test file**, `frontend/src/api.test.ts` (vitest, `cd frontend &&
-  npm test`, ~150 ms). It mocks `fetch` and pins the transport-layer mapping in `api.ts`
+- **Frontend has two vitest files** (`cd frontend && npm test`, well under a second).
+  `frontend/src/api.test.ts` mocks `fetch` and pins the transport-layer mapping in `api.ts`
   (`request()`, `baglantiHatasiMi()`): nginx 502/503/504 HTML → "ulasilamiyor", raw `TypeError`
   → "baglanilamadi", JSON `{error}` at any status → message verbatim and **not** a connection
-  error. This layer cannot be tested by spawning a backend (there is none), so suite C's **C14**
-  runs vitest as a child process (skips if `frontend/node_modules` is missing).
+  error. `frontend/src/env-order.test.ts` runs Vite's own `loadEnv` against a temp dir to pin
+  the `.env` file order (see Environment files). Neither can be tested by spawning a backend, so
+  suite C's **C14** runs vitest as a child process (skips if `frontend/node_modules` is missing).
 - JSON reports land in `tests/reports/`. `tests/TEST-PLAN.md` is the scenario matrix — its
   "Hata hangi katmanda dogdu?" table says which suite covers which of the three error layers
   (boot / API / transport).
@@ -92,13 +100,18 @@ the server under test).
 > (project `ipa-ota-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
 > service.
 
-Last full green run: **171/171** (2026-08-25; A+C = 108 incl. the 6 new cases, B = 14, D = 49) — A+B+C against the fixed
-sources, D against the live stack (still running the 2026-08-13 image, whose behavior the updated
-assertions also accept). Suite D asserts the current posture: no `/config.js` (D2.4), cookie
-`SameSite=None` + CORS open for `http://localhost:5173` only (D3.3/D3.5/D3.7), and the Origin
-guard rejecting foreign-origin writes (D3.8/D3.9). Group H in suite C (H1–H8) plus
-`A-baseurl-bicim` pin the 2026-08-20 bug fixes listed below. Evidence and history:
-`tests/BULGULAR-HTTPS.md`.
+Last full green run: **172/172** (2026-08-25, one A–D run right before the commit; A+C = 109 incl.
+C10b, B = 14, D = 49; report `tests/reports/rapor-2026-08-25T14-41-58-503Z.json`; the identical
+earlier run `rapor-2026-08-25T14-24-20-181Z.json` and the B/D reruns `…T14-24-25-671Z` 14/14,
+`…T14-24-26-306Z` 49/49 are committed too) — A+B+C against the working tree, D against the live
+stack. The api image was rebuilt 2026-08-25 14:07 +03, two minutes *before* commit
+21b0908, so the install-page hint fix below is **not deployed** until `cd backend && docker compose up
+-d --build`; no D case asserts on the non-iOS install page, so D is green either way. Suite D asserts
+the current posture: no `/config.js` (D2.4), cookie `SameSite=None` + CORS open for
+`http://localhost:5173` only (D3.3/D3.5/D3.7), and the Origin guard rejecting foreign-origin writes
+(D3.8/D3.9). Group H in suite C (H1–H8) plus `A-baseurl-bicim` pin the 2026-08-20 bug fixes listed
+below; C10b pins `BuildDto` field names. History (2026-08-10 and earlier — **the CORS posture
+described there was reversed on 2026-08-20**): `tests/BULGULAR-HTTPS.md`.
 
 #### Behavior fixes shipped 2026-08-25 (pinned by A15/A18b/A23/A24/A25, `acilisHatasi()`, C14)
 
@@ -118,6 +131,13 @@ guard rejecting foreign-origin writes (D3.8/D3.9). Group H in suite C (H1–H8) 
   pre-fix backend: 8 of 30 cases).
 - **`DATA_DIR` must be creatable and writable at boot** (`accessSync(W_OK)`), otherwise the
   process stops with the variable's name and the errno instead of failing later on DB open.
+- **Install-page iPad hint moved out of the hidden block** (H8). Commit 21b0908 put the
+  "Mobil Web Sitesi" instruction *inside* `#ipad-kurulum`, which the touch-detection script
+  reveals only together with the button — so whoever could not see the button could not see the
+  hint either — and wrote it with diacritics. The hint now lives in the always-visible
+  `#masaustu-uyari` (hidden only when detection succeeds and the button shows), starts with the
+  condition "Eger tarayiciniz Safari ise" (everyone else is sent to "mobil tarayicinizda"), uses
+  the `.safari-menu-icon` badge, is ASCII, and H8 asserts all of that in the non-iOS page.
 
 #### Behavior fixes shipped 2026-08-20 (pinned by suite C group H + `A-baseurl-bicim`)
 
@@ -197,8 +217,10 @@ machine's :3000 (see Architecture), so a stray dev backend can end up serving li
 
 `frontend` imports **nothing** from `backend`. The only contract is HTTP, and the DTO types in
 `frontend/src/api.ts` are kept in sync with `backend/src/modules/builds/build.dto.ts` +
-`backend/src/config/settings.schema.ts` **by hand**. Nothing catches the drift for you at compile
-time — test C10 is the guard.
+`backend/src/config/settings.schema.ts` **by hand**. Nothing catches the drift at compile time;
+suite C's **C10** (`AppConfig` ↔ the hard-coded `BEKLENEN_ALANLAR` list) and **C10b** (`BuildDto`
+parsed out of both files with the same regex) compare **field names only** — a type change
+(`string` → `number`) still passes.
 
 Since 2026-08-13 the separation is structural, not just conventional. Each service owns:
 
@@ -229,12 +251,16 @@ been **removed** — do not reintroduce it.
 |---|---|---|
 | `frontend/.env.production` | *empty* | relative paths (`/api/...`); the deployed SPA stays same-origin and never needs CORS |
 | `frontend/.env.development` | `https://ipa-ios.simurgbilisim.com` | dev SPA talks to the LIVE API cross-origin (`backend/.env` lists `http://localhost:5173` in `CORS_ORIGINS`) — panel actions hit production data |
-| `frontend/.env.local` (gitignored) | `http://localhost:3000` | points the dev SPA at the local backend instead; uploads land in `backend/data/` |
+| `frontend/.env.development.local` (gitignored; template `.env.development.local.example`) | `http://localhost:3000` | points the dev SPA at the local backend instead; uploads land in `backend/data/` |
 
 **`frontend/.env` is NOT in that table on purpose.** It exists, but it belongs to `docker compose`
-(it carries `WEB_PORT`). Vite nonetheless loads `.env` as its base file — order is
-`.env` → `.env.[mode]` → `.env.local` → `.env.[mode].local` — so a `VITE_`-prefixed variable
-written there would silently leak into the bundle. Keep `VITE_*` out of `frontend/.env`.
+(it carries `WEB_PORT`). Vite nonetheless loads `.env` as its base file — the order (Vite 6
+`getEnvFilesForMode`, pinned by `frontend/src/env-order.test.ts`) is
+`.env` → `.env.local` → `.env.[mode]` → `.env.[mode].local` — so a `VITE_`-prefixed variable
+written there silently leaks into the bundle whenever the mode file does not define the same key.
+Keep `VITE_*` out of `frontend/.env`. **Corollary: `frontend/.env.local` can never override
+`.env.development`** — it loads *before* the mode file; the per-machine override is
+`.env.development.local`. Every doc and template in this repo had that order wrong until 2026-08-25.
 
 Dev-SPA-to-live-API caveats: Safari blocks third-party cookies (use Chrome/Firefox), and host
 port 5173 is usually held by the frontend container — `cd frontend && docker compose stop web`
@@ -346,6 +372,11 @@ silently on the device.
 `ttlFrom: 'upload' | 'now'` decides what the new TTL is added to: `'upload'` corrects the original
 choice (can land in the past → link expires), `'now'` revives an expired link. Revocation is
 tracked separately (`revokedAt`) and editing TTL never silently un-revokes.
+Revocation also **starts the purge clock**: `findPurgeable()` selects
+`expires_at <= cutoff OR revoked_at <= cutoff` (cutoff = now − `purgeAfterExpiryHours`, default 24 h),
+so a revoked build loses its files after the same delay as an expired one, and from then on
+`unrevoke`/`extend` return 409 and the panel disables Düzenle — "un-revoke later" only works inside
+that window.
 
 ### Upload is two-phase on purpose
 
@@ -362,8 +393,10 @@ client gets 401 before sending a gigabyte of body.
   un-premultiply alpha). Unconvertible variants are skipped; the icon is optional, install is not.
 - **Migrations** (`db/migrations.ts`) are forward-only. Append to the array; never edit an existing
   entry.
-- **Cleanup** (`jobs/cleanup.job.ts`) deletes files but keeps the row, marking `files_deleted_at` —
-  the build shows as "purged" and the link returns 410 instead of vanishing.
+- **Cleanup** (`jobs/cleanup.job.ts`, at boot + every 15 min) purges builds that have been
+  **expired OR revoked** for longer than `purgeAfterExpiryHours` (`findPurgeable`): deletes files
+  but keeps the row, marking `files_deleted_at` — the build shows as "purged", the link returns
+  410, and `unrevoke`/`extend` return 409 from then on.
 - **`domain/storage/types.ts`** exists so a non-local driver (S3/MinIO) can be dropped in.
   `withLocalFile` is the awkward-but-necessary method: zip parsing needs random access, not a stream.
 - **`frontend/src/router.tsx`** is a ~70-line History API wrapper, not a router library.
@@ -400,7 +433,7 @@ is the main footgun of this layout:
 | `backend/.env.development` → `.env.local` | Node (`npm run dev`) | local dev config |
 | `backend/.env.production` → `.env.local` | Node (`npm start`, container `CMD`) | prod defaults, baked into the image |
 | `frontend/.env` | `docker compose` — **and Vite, unavoidably** | `WEB_PORT`; keep `VITE_*` out |
-| `frontend/.env.development` \| `.env.production` → `.env.local` | Vite | `VITE_API_BASE_URL` |
+| `frontend/.env.development` \| `.env.production` → `.env.[mode].local` | Vite | `VITE_API_BASE_URL` (`.env.local` loads *before* the mode file and cannot override it) |
 
 - Node never reads a bare `.env`: the files are named explicitly in each `package.json` via
   `--env-file-if-exists`. Vite is the exception — it always loads `.env` as its base file.
@@ -409,8 +442,8 @@ is the main footgun of this layout:
   `environment:`, which wins because it is a real env var.
 - Secrets live only in `backend/.env.local` (dev) and **`backend/.env`** (docker compose).
   Templates: `backend/.env.example`, `frontend/.env.example`, `backend/.env.local.example`,
-  `frontend/.env.local.example`. All `.env` / `.env.local` files are gitignored (the patterns are
-  slash-free, so they match at any depth).
+  `frontend/.env.development.local.example`. All `.env`, `.env.local` and `.env.*.local` files are
+  gitignored (the patterns are slash-free, so they match at any depth).
 - **`docker compose` reads the `.env` in its own directory**, so `backend/.env` and `frontend/.env`
   cannot see each other. `ADMIN_PASSWORD` and `SESSION_SECRET` use the `${VAR:?message}` form, so
   the backend stack **fails to start** rather than silently running passwordless.

@@ -1,8 +1,12 @@
 /**
- * C/D/F/G gruplari — haberlesme sozlesmesi, ayar alanlari, OTA akisi, kimlik.
+ * C/D/F/G/H gruplari — haberlesme sozlesmesi, ayar alanlari, OTA akisi, kimlik, regresyonlar.
  *
- * D/F/G izole bir sunucu ornegine karsi calisir (kullanicinin DB si kirlenmez).
- * C grubu canli arka uc ornegini hedefler (varsayilan http://localhost:3000).
+ * Acilis blogu (C1/C2/C3/C5/C16) CANLI `--taban` ornegini hedefler (varsayilan
+ * http://localhost:3000 — bu Mac'te URETIM api container'i; ayakta olmali).
+ * C3b web container'ini (frontend/.env WEB_PORT) yoklar, kapaliysa skip.
+ * C10/C10b/C14 ag kullanmaz (dosya okur / vitest kosar). D/F/G/H bloklari ve
+ * "C — Sozlesme (izole sunucu)" izole bir sunucu ornegine karsi calisir
+ * (kullanicinin DB'si kirlenmez).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -115,6 +119,27 @@ export async function calistir({ taban }) {
     return { detay: `${onAlanlar.length} alan eslesti` };
   });
 
+  await test('C10b', 'DTO drift: BuildDto alan adlari backend ↔ frontend birebir', async () => {
+    // Iki dosyadaki `export interface BuildDto { ... }` bloklarindan alan adlarini
+    // C10 ile AYNI regex'le cikarir; tipleri DEGIL, yalnizca ad kumesini karsilastirir
+    // (sira onemsiz). build.dto.ts icindeki JSDoc satirlari `^\s*(\w+)\s*[?:]`
+    // desenine uymadigi icin alan sayilmaz.
+    const alanlar = (dosya) => {
+      const kaynak = readFileSync(join(KOK, dosya), 'utf8');
+      const blok = /export interface BuildDto \{([\s\S]*?)\n\}/.exec(kaynak)?.[1];
+      bekle(blok, `${dosya}: 'export interface BuildDto {' blogu bulunamadi`);
+      return [...blok.matchAll(/^\s*(\w+)\s*[?:]/gm)].map((m) => m[1]);
+    };
+    const arka = alanlar('backend/src/modules/builds/build.dto.ts');
+    const on = alanlar('frontend/src/api.ts');
+    const eksik = arka.filter((a) => !on.includes(a));
+    const fazla = on.filter((a) => !arka.includes(a));
+    bekle(eksik.length === 0, `Frontend te eksik alan: ${eksik.join(', ')}`);
+    bekle(fazla.length === 0, `Frontend te fazladan alan: ${fazla.join(', ')}`);
+    bekle(arka.length >= 20, `beklenenden az alan cikarildi (regex bozuk?): ${arka.length}`);
+    return { detay: `${arka.length} alan eslesti (tipler karsilastirilmaz)` };
+  });
+
   await test('C16', 'Kurulum sayfasi onbelleklenmiyor (cache-control: no-store)', async () => {
     const r = await canli.get('/i/olmayan-token');
     // 404 sayfasinda da, gecerli sayfada da onbellek disi olmali; gecerli
@@ -126,7 +151,7 @@ export async function calistir({ taban }) {
     // Bu katman backend calistirilarak test EDILEMEZ: "nginx 502 + HTML govde"
     // ve "fetch'in kendisi patladi (ag/DNS/CORS)" senaryolarinda backend yoktur.
     // Esleme (`request()`, `baglantiHatasiMi()`) frontend/src/api.test.ts
-    // icinde fetch taklit edilerek pinlenir; buradan kosulur ki tek bir
+    // + env-order.test.ts (Vite .env sirasi) icinde pinlenir; buradan kosulur ki tek bir
     // `run-suite` cagrisi uc katmani da (acilis / API / tasima) kapsasin.
     // 2026-08-25: kapali backend "ADMIN_PASSWORD tanimlanmamis" diye
     // raporlaniyordu — bu katmanin testi yoktu.
@@ -148,8 +173,8 @@ export async function calistir({ taban }) {
       r.status === 0 && rapor.success,
       `vitest basarisiz (${rapor.numFailedTests} hata):\n${r.stdout.slice(-800)}${r.stderr.slice(-400)}`,
     );
-    bekle(rapor.numTotalTests >= 10, `beklenenden az test kostu: ${rapor.numTotalTests}`);
-    return { detay: `${rapor.numPassedTests}/${rapor.numTotalTests} gecti (frontend/src/api.test.ts)` };
+    bekle(rapor.numTotalTests >= 14, `beklenenden az test kostu: ${rapor.numTotalTests}`);
+    return { detay: `${rapor.numPassedTests}/${rapor.numTotalTests} gecti (frontend vitest: api.test.ts + env-order.test.ts)` };
   });
 
   /* ===================================================================== */
@@ -1091,6 +1116,12 @@ export async function calistir({ taban }) {
     await test('H8', 'iPad (masaustu gorunumu) kurulum butonuna JS tespitiyle kavusuyor', async () => {
       // iPadOS 13+ masaustu Safari ile ayni UA'yi verir; sunucu ayirt edemez.
       // Sayfa QR gorunumune gizli bir kurulum blogu + dokunmatik tespit betigi koyar.
+      // Tespit basarisiz olursa (JS kapali, baska tarayici) kullanicinin tek yolu
+      // Safari menusundeki "Mobil Web Sitesi"dir (etiket iPad'de dogrulandi); bu
+      // talimat HER ZAMAN gorunen #masaustu-uyari icinde olmali — 21b0908 onu
+      // gizli bloga koymustu, yani butonu goremeyen talimati da goremiyordu
+      // (2026-08-25'te duzeltildi). Uyari ayrica mobil tarayiciya yonlendirmeli,
+      // iPhone sayfasinda ise "Safari" markasi hic gecmemeli (CSS dahil).
       const y = await c.yukle(join(FIX, 'demo-a.ipa'));
       const b = y.govde.build;
       const macUA =
@@ -1100,13 +1131,27 @@ export async function calistir({ taban }) {
       bekle(govde.includes('id="ipad-kurulum"'), 'gizli iPad kurulum blogu yok');
       bekle(/itms-services:/.test(govde), 'iPad blogunda itms-services linki yok');
       bekle(/maxTouchPoints/.test(govde), 'dokunmatik tespit betigi yok');
-      bekle(/safari-menu-icon/.test(govde), 'Safari menusu simgesi yok');
-      bekle(/Mobil Web Sitesini Isteyin/.test(govde), 'mobil web sitesi talimatı yok');
+
+      const uyari = /<div class="notice warn" id="masaustu-uyari">([\s\S]*?)<\/div>/.exec(govde)?.[1] ?? '';
+      bekle(uyari.length > 0, 'her zaman gorunen masaustu uyarisi (#masaustu-uyari) yok');
+      bekle(/Eger tarayiciniz Safari ise/.test(uyari), 'talimat Safari kosuluyla baslamali');
+      bekle(/Mobil Web Sitesi/.test(uyari), 'mobil web sitesi talimati masaustu uyarisinda yok');
+      bekle(/mobil tarayicinizda/.test(uyari), 'masaustu uyarisi mobil tarayiciya yonlendirmeli');
+      bekle(/class="safari-menu-icon"/.test(uyari), 'menu simgesi (class="safari-menu-icon") uyari icinde kullanilmiyor');
+      bekle(
+        !/[^\x00-\x7F]/.test(uyari.replace(/&[a-z#0-9]+;/gi, '')),
+        'masaustu uyarisinda ASCII disi karakter var (Turkce diakritik kurali)',
+      );
+      const ipadBlok = /<div id="ipad-kurulum" hidden>([\s\S]*?)<\/div>/.exec(govde)?.[1] ?? '';
+      bekle(!/Mobil Web Sitesi/.test(ipadBlok), 'talimat hala gizli blokta (butonu goremeyen bunu da goremez)');
+
       // iPhone gorunumu eskisi gibi dogrudan buton icermeli.
       const tel = String((await c.get(`/i/${b.token}`, IOS)).govde);
       bekle(/itms-services:/.test(tel), 'iPhone gorunumunde buton yok');
+      bekle(/mobil tarayiciniz disinda/.test(tel), 'iPhone uyarisi mobil tarayiciyi soylemeli');
+      bekle(!/Safari/.test(tel), 'iPhone sayfasinda "Safari" ifadesi kalmamali');
       await c.del(`/api/builds/${b.id}`);
-      return { detay: 'Macintosh UA: gizli buton + tespit betigi' };
+      return { detay: 'Macintosh UA: gizli buton + tespit betigi + gorunur "Mobil Web Sitesi" talimati' };
     });
 
     /* --------------------------------------------------------------- */

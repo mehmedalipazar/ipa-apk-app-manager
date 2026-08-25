@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   await app.listen({ port: env.PORT, host: env.HOST });
 
   /* --- Acilis tanilamasi --------------------------------------------------- */
-  // Veritabaninin TAM YOLU loga yazilir: "verilerimi nerede goreceğim"
+  // Veritabaninin TAM YOLU loga yazilir: "verilerimi nerede gorecegim"
   // sorusunun cevabi her aciliste ekranda dursun.
   app.log.info(
     { dosya: resolve(dbPath()), dataDir: resolve(env.DATA_DIR) },

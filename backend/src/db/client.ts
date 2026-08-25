@@ -2,8 +2,13 @@
  * SQLite baglantisi. Tek dosya, tek process — self-hosted kullanim icin yeterli.
  *
  * Dosya `DATA_DIR/ipa-ota.db` konumundadir. Gelistirmede DATA_DIR=./data
- * oldugu icin veritabani depo icinde durur ve dogrudan `sqlite3` ile acilabilir;
- * uretimde /data'ya baglanan birim (bind mount) ayni dosyayi host'ta gosterir.
+ * oldugu icin veritabani depo icinde durur ve sunucu KAPALIYKEN dogrudan
+ * `sqlite3` ile acilabilir; uretimde /data'ya baglanan bind mount ayni dosyayi
+ * host'ta gosterir — AMA container calisirken host'tan ACMAYIN: POSIX
+ * kilitleri Docker Desktop bind mount'undan gecmez, host tarafi kendini yalniz
+ * sanip WAL'i budar ve container'in commit'lerini siler (2026-08-10'da bir
+ * kayit boyle kaybedildi). Once `docker compose stop api` (dbadmin acik ise
+ * `npm run db:ui:down`).
  *
  * WAL modu kullanildigindan veriyi baska bir arac ile okurken `-wal` ve `-shm`
  * yan dosyalarini da hesaba katin: yalnizca `.db` dosyasini kopyalarsaniz
