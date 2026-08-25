@@ -119,6 +119,22 @@ guard rejecting foreign-origin writes (D3.8/D3.9). Group H in suite C (H1–H8) 
   whole uploads root); a zip entry exceeding its declared size now fails parsing instead of
   hanging the request; the `Content-Disposition` filename sanitizes the version string too.
 
+#### Frontend fix shipped 2026-08-25 (no harness coverage)
+
+- **A dead backend no longer reads as "ADMIN_PASSWORD is not set".** `App.tsx` used to swallow
+  every `api.me()` failure into `{ configured: false }`, and `LoginPage` renders exactly one thing
+  for that flag — so any API outage (nginx 502, network error, CORS block) produced a confident but
+  wrong instruction to go set an env var that was already set. Since `GET /api/auth/me` is
+  unguarded and **always** answers 200 once reached (`auth.module.ts`), a throw there means
+  *unreachable*, never *unconfigured*. The two states are now distinct: `configured` is false only
+  when the server actually said so, and a connectivity failure renders the real reason plus a
+  "Tekrar dene" button (`baglantiHatasiMi` / `baglantiHatasiMetni` in `frontend/src/api.ts`).
+
+> The `tests/` harness drives the HTTP API, not React, so it cannot catch this class of bug.
+> Verified by hand against a throwaway local server that serves `frontend/dist` and returns
+> nginx-style 502 for `/api/*`: 502 ⇒ "Sunucuya ulasilamiyor (HTTP 502)"; retry after recovery ⇒
+> login form; reachable-but-`configured:false` ⇒ the ADMIN_PASSWORD warning still appears.
+
 ### Docker
 
 Two separate stacks, two separate compose projects. Neither file knows about the other service.
@@ -141,7 +157,8 @@ results look impossible, run `lsof -nP -iTCP:3000 -sTCP:LISTEN` first. This is a
 **production** concern, not just a dev nuisance: the public domain's nginx forwards to this
 machine's :3000 (see Architecture), so a stray dev backend can end up serving live traffic.
 
-> Quickest way to tell *who answered*: `GET /healthz` returns `uptime` **in seconds**. A server you
+> Quickest way to tell *who answered* (probing `:3000` **directly**, not through the domain — see
+> the liveness note under Architecture): `GET /healthz` returns `uptime` **in seconds**. A server you
 > just started reports `0`–`2`; a large value means an already-running container replied, not your
 > process. This bit during the 2026-08-13 split: Docker Desktop started in the background mid-task
 > and `restart: unless-stopped` revived the old containers, making a probe of the "new" backend
@@ -212,7 +229,15 @@ The proxy's upstream is **this machine**: a LAN nginx (not in this repo, not on 
 terminates TLS for the domain and forwards to 192.168.20.205:3000/:5173 — the compose stacks here
 *are* production. Since the split there are **two** of them, so a 502 now localizes the fault:
 `/` 502 ⇒ frontend down, `/api/*` 502 ⇒ backend down. Either way the certificate stays perfectly
-valid (measured 2026-08-10), so check liveness via `https://…/healthz`, never via TLS alone.
+valid (measured 2026-08-10), so never infer liveness from TLS alone.
+
+> **The public `/healthz` does NOT report the backend — do not use it as a liveness probe.**
+> That path is answered by the *frontend* container's nginx as a constant `return 200 "ok"`
+> (`frontend/nginx.conf`), while the backend's own `/healthz`
+> (`modules/system/system.module.ts`) sits **outside** the proxied `/api/*` prefix and is therefore
+> unreachable from the domain. Measured 2026-08-25 with `api` stopped: `https://…/healthz` still
+> returned `200 ok` while every `/api/*` returned 502. Probe the backend through `/api/*`
+> (e.g. `GET /api/settings`), or hit `/healthz` directly on `:3000`.
 
 ### CORS is deliberately open for `http://localhost:5173` (decision 2026-08-10)
 

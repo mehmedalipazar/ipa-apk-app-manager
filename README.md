@@ -333,7 +333,8 @@ eşleşmez).
 > üretim trafiği yanlış sürece düşebilir. Şüphede:
 > `lsof -nP -iTCP:3000 -sTCP:LISTEN`, gerekirse `cd backend && docker compose stop api`.
 >
-> Hangi sürecin cevap verdiğini anlamanın hızlı yolu **`GET /healthz`**: dönen `uptime`
+> Hangi sürecin cevap verdiğini anlamanın hızlı yolu — **doğrudan `:3000`'e**, alan adı
+> üzerinden değil — **`GET /healthz`**: dönen `uptime`
 > **saniye** cinsindendir. Yeni başlattığınız sunucu `0`–`2` verir; büyük bir değer
 > görüyorsanız cevabı veren sizin süreciniz değil, önceden çalışan container'dır.
 > (13 Ağustos 2026'da tam olarak bu yaşandı: Docker Desktop arka planda açıldı,
@@ -389,10 +390,17 @@ imajlarla). Senaryo matrisi `tests/TEST-PLAN.md`, kanıt geçmişi
 - **Canlı domain 502 veriyorsa** sorun sertifika değil, servisin kapalı olmasıdır. Artık
   iki ayrı yığın olduğu için hangisinin düştüğü ayrı ayrı bakılır: `/` 502 ise frontend,
   `/api/*` 502 ise backend. `cd backend && docker compose ps` / `cd frontend && docker
-  compose ps` ve `GET /healthz`.
+  compose ps`.
+- **Alan adı üzerinden `/healthz` backend'i ölçmez — canlılık testi olarak kullanmayın.**
+  O yolu *frontend* container'ının nginx'i sabit `200 "ok"` ile karşılar
+  (`frontend/nginx.conf`); backend'in kendi `/healthz`'i ise proxy'nin taşıdığı `/api/*`
+  önekinin **dışında** kaldığı için alan adından erişilemez. 25 Ağustos 2026'da ölçüldü:
+  `api` durdurulmuşken `https://…/healthz` hâlâ `200 ok` derken bütün `/api/*` 502
+  veriyordu. Backend'i `/api/*` altından yoklayın (örn. `GET /api/settings`) ya da
+  doğrudan `:3000` üzerinden `/healthz` çağırın.
 - **Log:** `cd backend && docker compose logs -f api` — arayüz için
-  `cd frontend && docker compose logs -f web`. **Sağlık:** iki serviste de `GET /healthz`
-  (backend'inki `uptime` saniyesini de döner).
+  `cd frontend && docker compose logs -f web`. **Sağlık:** her servisi kendi portunda
+  `GET /healthz` ile (backend'inki `uptime` saniyesini de döner).
 - **Durdurma sırası yoktur** — servisler birbirine bağlı değildir. Arayüzü kapatmak
   kurulum linklerini etkilemez (onları backend sunar); API'yi kapatmak paneli işlevsiz
   bırakır ama SPA yine yüklenir.

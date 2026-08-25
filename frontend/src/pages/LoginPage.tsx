@@ -1,12 +1,36 @@
 import { useState } from 'react';
 import { Alert, Spinner } from '../components/common.tsx';
 import { IconApple } from '../components/icons.tsx';
-import { ApiError, api } from '../api.ts';
+import { ApiError, api, baglantiHatasiMetni, baglantiHatasiMi } from '../api.ts';
 
-export function LoginPage({ onLogin, configured }: { onLogin: () => void; configured: boolean }) {
+/**
+ * Giris ekrani iki farkli "simdi giremezsin" durumunu ayirt eder:
+ *
+ *   sunucuHatasi != null  ->  API'ye ulasilamiyor. Sifre denemek anlamsiz,
+ *                             form hic cizilmez; kullaniciya sebep + tekrar
+ *                             deneme sunulur.
+ *   configured == false   ->  Sunucuya ULASILDI ve "admin sifresi tanimli
+ *                             degil" dedi. Yalnizca bu durumda ADMIN_PASSWORD
+ *                             uyarisi cikar.
+ *
+ * Ikisi eskiden tek bayrakti; backend kapaliyken de ADMIN_PASSWORD uyarisi
+ * basiliyordu (yanlis teshis).
+ */
+export function LoginPage({
+  onLogin,
+  configured,
+  sunucuHatasi,
+  onYenidenDene,
+}: {
+  onLogin: () => void;
+  configured: boolean;
+  sunucuHatasi: string | null;
+  onYenidenDene: () => Promise<void>;
+}) {
   const [sifre, setSifre] = useState('');
   const [hata, setHata] = useState<string | null>(null);
   const [bekliyor, setBekliyor] = useState(false);
+  const [deneniyor, setDeneniyor] = useState(false);
 
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,9 +40,21 @@ export function LoginPage({ onLogin, configured }: { onLogin: () => void; config
       await api.login(sifre);
       onLogin();
     } catch (err) {
-      setHata(err instanceof ApiError ? err.message : 'Giris yapilamadi.');
+      // Sayfa acikken sunucu duserse ham "Istek basarisiz (HTTP 502)" yerine
+      // ne oldugunu soyleyen metni goster.
+      if (baglantiHatasiMi(err)) setHata(baglantiHatasiMetni(err));
+      else setHata(err instanceof ApiError ? err.message : 'Giris yapilamadi.');
     } finally {
       setBekliyor(false);
+    }
+  };
+
+  const yenidenDene = async () => {
+    setDeneniyor(true);
+    try {
+      await onYenidenDene();
+    } finally {
+      setDeneniyor(false);
     }
   };
 
@@ -33,7 +69,13 @@ export function LoginPage({ onLogin, configured }: { onLogin: () => void; config
           </p>
         </div>
 
-        {!configured && (
+        {sunucuHatasi && (
+          <div className="alerts">
+            <Alert kind="err">{sunucuHatasi}</Alert>
+          </div>
+        )}
+
+        {!sunucuHatasi && !configured && (
           <div className="alerts">
             <Alert kind="warn">
               Admin sifresi tanimlanmamis. Sunucuda <code>ADMIN_PASSWORD</code> ortam degiskenini
@@ -42,38 +84,63 @@ export function LoginPage({ onLogin, configured }: { onLogin: () => void; config
           </div>
         )}
 
-        {hata && (
+        {hata && !sunucuHatasi && (
           <div className="alerts">
             <Alert kind="err">{hata}</Alert>
           </div>
         )}
 
-        <form className="card" onSubmit={(e) => void gonder(e)}>
-          <div className="card-body">
-            <div className="field">
-              <label htmlFor="sifre">Sifre</label>
-              <input
-                id="sifre"
-                className="input"
-                type="password"
-                autoComplete="current-password"
-                value={sifre}
-                autoFocus
-                disabled={!configured || bekliyor}
-                onChange={(e) => setSifre(e.target.value)}
-              />
+        {sunucuHatasi ? (
+          <div className="card">
+            <div className="card-body">
+              <button
+                className="btn block"
+                type="button"
+                disabled={deneniyor}
+                onClick={() => void yenidenDene()}
+              >
+                {deneniyor ? (
+                  <>
+                    <Spinner /> Deneniyor
+                  </>
+                ) : (
+                  'Tekrar dene'
+                )}
+              </button>
             </div>
-            <button className="btn block" type="submit" disabled={!configured || bekliyor || !sifre}>
-              {bekliyor ? (
-                <>
-                  <Spinner /> Kontrol ediliyor
-                </>
-              ) : (
-                'Giris yap'
-              )}
-            </button>
           </div>
-        </form>
+        ) : (
+          <form className="card" onSubmit={(e) => void gonder(e)}>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="sifre">Sifre</label>
+                <input
+                  id="sifre"
+                  className="input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={sifre}
+                  autoFocus
+                  disabled={!configured || bekliyor}
+                  onChange={(e) => setSifre(e.target.value)}
+                />
+              </div>
+              <button
+                className="btn block"
+                type="submit"
+                disabled={!configured || bekliyor || !sifre}
+              >
+                {bekliyor ? (
+                  <>
+                    <Spinner /> Kontrol ediliyor
+                  </>
+                ) : (
+                  'Giris yap'
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

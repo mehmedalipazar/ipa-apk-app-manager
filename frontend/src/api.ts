@@ -159,6 +159,28 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Hata "sunucuya hic ulasilamadi" anlamina mi geliyor?
+ *
+ * Ters proxy ayakta ama backend kapaliysa nginx 502/503/504 + HTML govde
+ * doner; `request()` bu govdeden mesaj cikaramaz ve genel metinli bir
+ * ApiError uretir. fetch'in kendisi patlarsa (ag yok, DNS, CORS, TLS)
+ * ApiError bile olusmaz, ham TypeError gelir. Ikisi de ayni seyi soyler:
+ * sorun istegin iceriginde degil, servise erisimde.
+ */
+export function baglantiHatasiMi(err: unknown): boolean {
+  if (err instanceof ApiError) return err.status === 0 || err.status >= 502;
+  return err instanceof TypeError;
+}
+
+/** Baglanti hatasi icin kullaniciya gosterilecek metin. */
+export function baglantiHatasiMetni(err: unknown): string {
+  if (err instanceof ApiError && err.status > 0) {
+    return `Sunucuya ulasilamiyor (HTTP ${err.status}). API servisi calismiyor olabilir.`;
+  }
+  return 'Sunucuya baglanilamadi. API servisi kapali olabilir veya ag baglantinizda sorun var.';
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(apiUrl(path), {
     ...init,

@@ -6,17 +6,29 @@ import { BuildsPage } from './pages/BuildsPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
 import { Spinner } from './components/common.tsx';
 import { IconApple, IconBox, IconLogout, IconSettings, IconUpload } from './components/icons.tsx';
-import { api, type SessionInfo } from './api.ts';
+import { api, baglantiHatasiMetni, type SessionInfo } from './api.ts';
 
 export function App() {
   const { path, navigate } = useRouter();
   const [session, setSession] = useState<SessionInfo | null>(null);
+  const [sunucuHatasi, setSunucuHatasi] = useState<string | null>(null);
 
+  // `/api/auth/me` sunucu tarafinda korumasizdir ve ULASILDIGI SURECE her
+  // zaman 200 doner (`backend/src/modules/auth/auth.module.ts`). Dolayisiyla
+  // buraya dusmek "oturum yok" degil, "API'ye hic ulasilamadi" demektir:
+  // backend kapali (nginx 502), ag hatasi, CORS engeli...
+  //
+  // Eskiden bu blok `configured: false` yaziyordu; giris ekrani da bunu
+  // "ADMIN_PASSWORD tanimlanmamis" diye yorumlayip operatoru var olmayan bir
+  // yapilandirma hatasina yonlendiriyordu. Iki durum artik ayri tutulur:
+  // `configured` yalnizca sunucu gercekten oyle dediginde false olabilir.
   const oturumuTazele = useCallback(async () => {
     try {
       setSession(await api.me());
-    } catch {
-      setSession({ authenticated: false, configured: false, expiresAt: null });
+      setSunucuHatasi(null);
+    } catch (err) {
+      setSession(null);
+      setSunucuHatasi(baglantiHatasiMetni(err));
     }
   }, []);
 
@@ -43,7 +55,9 @@ export function App() {
     navigate('/');
   };
 
-  if (!session) {
+  // Ilk okuma daha bitmedi. Basarisiz bittiyse `sunucuHatasi` dolar ve
+  // asagidaki giris ekrani sebebi yaziyla soyler; sonsuz spinner olmaz.
+  if (!session && !sunucuHatasi) {
     return (
       <div className="center-screen">
         <Spinner />
@@ -54,10 +68,12 @@ export function App() {
   // Bu arayuzun tamami yonetici panelidir: yukleme de, surum yonetimi de
   // oturum ister. Son kullanicinin gordugu tek sayfa sunucunun urettigi
   // `/i/:token` kurulum sayfasidir; oraya bu SPA hic karismaz.
-  if (!session.authenticated) {
+  if (!session?.authenticated) {
     return (
       <LoginPage
-        configured={session.configured}
+        configured={session?.configured ?? false}
+        sunucuHatasi={sunucuHatasi}
+        onYenidenDene={oturumuTazele}
         onLogin={() => {
           void oturumuTazele().then(() =>
             navigate(path.startsWith('/admin') ? path : '/', { replace: true }),
