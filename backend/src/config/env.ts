@@ -180,6 +180,21 @@ function load(): Env {
   return { ...env, cookieSameSite: sameSite, cookieSecure: secure } as Env;
 }
 
-export const env: Env = load();
+/**
+ * Yapilandirma hatasi bir yazilim hatasi degildir: operatorun okuyacagi tek
+ * satirlik sebep yeterlidir, Node'un modul yukleme stack trace'i degil.
+ * `index.ts`teki AuthError dali ile ayni bicimde basilir ve exit 1 ile cikilir.
+ */
+function yukleYaDaCik(): Env {
+  try {
+    return load();
+  } catch (e) {
+    const mesaj = e instanceof Error ? e.message : String(e);
+    console.error(`\n  Yapilandirma hatasi: ${mesaj}\n`);
+    process.exit(1);
+  }
+}
+
+export const env: Env = yukleYaDaCik();
 
 export const isProd = env.NODE_ENV === 'production';

@@ -355,8 +355,11 @@ Kod notları:
 
 ### Testler
 
-`npm test` yoktur; gerçek paket kökteki `tests/` altında çerçevesiz `.mjs` betikleridir
-(yalnızca Node builtin'leri kullanır, kurulum gerektirmez):
+Gerçek paket kökteki `tests/` altında çerçevesiz `.mjs` betikleridir (yalnızca Node
+builtin'leri kullanır, kurulum gerektirmez). Tek istisna `frontend`'deki `npm test`
+(vitest): `fetch`'i taklit ederek "backend kapalı / nginx 502 / ağ hatası" gibi backend'in hiç
+göremediği taşıma katmanı hatalarının arayüzde doğru mesaja dönüştüğünü sınar; suite C'nin
+C14 adımı bunu otomatik koşar.
 
 ```bash
 node tests/run-suite.mjs A C    # şu an sağlıklı çalışan gruplar

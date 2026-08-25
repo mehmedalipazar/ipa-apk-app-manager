@@ -1,7 +1,7 @@
 /**
  * Giris noktasi: kabi kur, sifreyi hazirla, sunucuyu baslat.
  */
-import { mkdirSync } from 'node:fs';
+import { accessSync, constants, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { env } from './config/env.ts';
 import { createContainer } from './container.ts';
@@ -10,7 +10,20 @@ import { closeDb, dbPath } from './db/client.ts';
 import { AuthError } from './shared/errors.ts';
 
 async function main(): Promise<void> {
-  mkdirSync(env.DATA_DIR, { recursive: true });
+  // DATA_DIR olusturulamiyor ya da yazilamiyorsa bu bir yapilandirma
+  // hatasidir; ham EPERM/EACCES stack trace'i yerine hangi degiskenin
+  // duzeltilecegini soyle (env.ts ve AuthError ile ayni bicim).
+  try {
+    mkdirSync(env.DATA_DIR, { recursive: true });
+    accessSync(env.DATA_DIR, constants.W_OK);
+  } catch (e) {
+    const kod = (e as NodeJS.ErrnoException).code ?? 'hata';
+    console.error(
+      `\n  Yapilandirma hatasi: DATA_DIR yazilabilir degil (${resolve(env.DATA_DIR)}, ${kod}). ` +
+        'Var olan ve yazma izni olan bir dizin verin.\n',
+    );
+    process.exit(1);
+  }
 
   // Kap, logger hazir olmadan once kuruluyor; gecici log fonksiyonu.
   const gecici = (msg: string, extra?: unknown) => {

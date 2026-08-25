@@ -71,7 +71,15 @@ the server under test).
   `INSTALL_PATH_PREFIX` and `ADMIN_PASSWORD` from **`backend/.env`** (the compose secrets file) —
   it logs into the live panel and uploads/removes throwaway builds, so treat a D run as touching
   production.
-- JSON reports land in `tests/reports/`. `tests/TEST-PLAN.md` is the scenario matrix.
+- **Frontend has one real unit test file**, `frontend/src/api.test.ts` (vitest, `cd frontend &&
+  npm test`, ~150 ms). It mocks `fetch` and pins the transport-layer mapping in `api.ts`
+  (`request()`, `baglantiHatasiMi()`): nginx 502/503/504 HTML → "ulasilamiyor", raw `TypeError`
+  → "baglanilamadi", JSON `{error}` at any status → message verbatim and **not** a connection
+  error. This layer cannot be tested by spawning a backend (there is none), so suite C's **C14**
+  runs vitest as a child process (skips if `frontend/node_modules` is missing).
+- JSON reports land in `tests/reports/`. `tests/TEST-PLAN.md` is the scenario matrix — its
+  "Hata hangi katmanda dogdu?" table says which suite covers which of the three error layers
+  (boot / API / transport).
 - Test IPAs: `tests/fixtures/*.ipa`, regenerate with `node tests/fixtures/make-ipa.mjs <out.ipa> …`.
 
 > **Post-split breakage was repaired 2026-08-20.** After the 2026-08-13 split, B and D read the
@@ -84,13 +92,32 @@ the server under test).
 > (project `ipa-ota-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
 > service.
 
-Last full green run: **165/165** (2026-08-20; A+C = 102, B = 14, D = 49) — A+B+C against the fixed
+Last full green run: **171/171** (2026-08-25; A+C = 108 incl. the 6 new cases, B = 14, D = 49) — A+B+C against the fixed
 sources, D against the live stack (still running the 2026-08-13 image, whose behavior the updated
 assertions also accept). Suite D asserts the current posture: no `/config.js` (D2.4), cookie
 `SameSite=None` + CORS open for `http://localhost:5173` only (D3.3/D3.5/D3.7), and the Origin
 guard rejecting foreign-origin writes (D3.8/D3.9). Group H in suite C (H1–H8) plus
 `A-baseurl-bicim` pin the 2026-08-20 bug fixes listed below. Evidence and history:
 `tests/BULGULAR-HTTPS.md`.
+
+#### Behavior fixes shipped 2026-08-25 (pinned by A15/A18b/A23/A24/A25, `acilisHatasi()`, C14)
+
+- **A down backend is no longer reported as "ADMIN_PASSWORD tanimlanmamis"** (commit 67d70fc):
+  `App.tsx` used to turn every `api.me()` failure into `configured:false`. Now `sunucuHatasi` is a
+  separate state and `LoginPage` shows the ADMIN_PASSWORD hint only when the server actually said
+  `configured:false` (A25 pins that server signal).
+- **`ApiError.sunucudan`** tells whether the message came from the server's own JSON `{error}`
+  body. `baglantiHatasiMi()` treats a 5xx as "unreachable" only when it did **not** — the backend's
+  own `503 {error:"Admin sifresi tanimlanmamis..."}` must surface verbatim, while nginx's 503 HTML
+  means the backend is down. Same status code, opposite diagnosis; the body is the tell.
+- **Every boot failure prints one clean line** — `Yapilandirma hatasi: ...` + exit 1, no Node stack
+  trace. `env.ts` (`yukleYaDaCik()`) and the `DATA_DIR` mkdir/`W_OK` check in `index.ts` now match
+  the `AuthError` path; before, `SESSION_SECRET`/zod/`DATA_DIR` errors printed the right message
+  buried in `at ModuleJob.run` lines. Suite A's `acilisHatasi()` helper asserts exit code 1, the
+  prefix, and the absence of stack frames for all boot-failure cases (verified to FAIL against the
+  pre-fix backend: 8 of 30 cases).
+- **`DATA_DIR` must be creatable and writable at boot** (`accessSync(W_OK)`), otherwise the
+  process stops with the variable's name and the errno instead of failing later on DB open.
 
 #### Behavior fixes shipped 2026-08-20 (pinned by suite C group H + `A-baseurl-bicim`)
 

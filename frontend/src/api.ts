@@ -150,12 +150,21 @@ export class ApiError extends Error {
    * Panel bu bilgiyle mesaji dogru girdinin altinda gosterir.
    */
   readonly field?: string;
+  /**
+   * Mesaj sunucunun kendi JSON govdesinden mi geldi (`{ error }`), yoksa
+   * govde okunamadigi icin uretilen genel metin mi? Ayni durum kodu iki
+   * farkli seyi anlatabilir: backend'in dondurdugu `503 {error:"Admin
+   * sifresi tanimlanmamis..."}` bir yapilandirma mesajidir, nginx'in
+   * backend kapaliyken dondurdugu `503` + HTML govde ise ulasilamama.
+   */
+  readonly sunucudan: boolean;
 
-  constructor(message: string, status: number, field?: string) {
+  constructor(message: string, status: number, field?: string, sunucudan = false) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.field = field;
+    this.sunucudan = sunucudan;
   }
 }
 
@@ -169,7 +178,9 @@ export class ApiError extends Error {
  * sorun istegin iceriginde degil, servise erisimde.
  */
 export function baglantiHatasiMi(err: unknown): boolean {
-  if (err instanceof ApiError) return err.status === 0 || err.status >= 502;
+  // Sunucu konusabildiyse (JSON govdede kendi mesaji varsa) ulasilmistir;
+  // 5xx olsa bile o mesaj kullaniciya oldugu gibi gosterilmeli.
+  if (err instanceof ApiError) return !err.sunucudan && (err.status === 0 || err.status >= 502);
   return err instanceof TypeError;
 }
 
@@ -204,15 +215,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const mesaj =
+    const sunucuMesaji =
       govde && typeof govde === 'object' && 'error' in govde && typeof govde.error === 'string'
         ? govde.error
-        : `Istek basarisiz (HTTP ${response.status})`;
+        : null;
     const alan =
       govde && typeof govde === 'object' && 'field' in govde && typeof govde.field === 'string'
         ? govde.field
         : undefined;
-    throw new ApiError(mesaj, response.status, alan);
+    throw new ApiError(
+      sunucuMesaji ?? `Istek basarisiz (HTTP ${response.status})`,
+      response.status,
+      alan,
+      sunucuMesaji !== null,
+    );
   }
 
   return govde as T;

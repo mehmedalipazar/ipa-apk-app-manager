@@ -5,13 +5,36 @@
  * degiskenin GOZLEMLENEBILIR bir etkisi olup olmadigini dogrular.
  */
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { chmodSync, existsSync } from 'node:fs';
 import {
   grup, test, bekle, esit, sunucuIle, sunucuBaslat, geciciDizin, dizinSil,
-  bosPort, Istemci, KOK,
+  bosPort, Istemci, KOK, IOS, manifestAdresiCikar,
 } from './lib/harness.mjs';
 
 const SIFRE = 'TestSifresi-1453!';
+const FIX = join(KOK, 'tests/fixtures');
+
+/**
+ * Acilis hatasi beklenen senaryolarin ortak sozlesmesi. "Kalkmadi" yetmez;
+ * operatorun gorecegi cikti da sinanir:
+ *   - exit kodu 1 (docker/systemd yeniden baslatma dongusu bunu gorur),
+ *   - mesaj TEK bicimde: "Yapilandirma hatasi: ..." (env.ts, index.ts ve
+ *     AuthError dallari ayni satiri basar),
+ *   - Node stack trace'i YOK ("    at ModuleJob.run ..." satirlari). 2026-08-25
+ *     oncesinde SESSION_SECRET/zod/DATA_DIR hatalari dogru mesaji 10 satir
+ *     stack trace arasinda basiyordu; ADMIN_PASSWORD ise temizdi.
+ */
+async function acilisHatasi(env, mesajDeseni, secenekler = {}) {
+  const s = await sunucuBaslat(env, secenekler);
+  await s.durdur();
+  s.temizle();
+  bekle(!s.hazir, `sunucu kalkmamaliydi. Cikti: ${s.cikti.slice(-300)}`);
+  esit(s.cikisKodu, 1, 'cikis kodu');
+  bekle(mesajDeseni.test(s.cikti), `beklenen mesaj yok:\n${s.cikti.slice(-400)}`);
+  bekle(/Yapilandirma hatasi:/.test(s.cikti), `mesaj "Yapilandirma hatasi:" bicimiyle basilmadi:\n${s.cikti.slice(-400)}`);
+  bekle(!/^\s+at .+\(.+:\d+:\d+\)/m.test(s.cikti), `ciktida stack trace var:\n${s.cikti.slice(-400)}`);
+  return s.cikti;
+}
 
 export async function calistir() {
   grup('A — Ortam degiskeni okuma');
@@ -222,12 +245,8 @@ export async function calistir() {
 
   /* A13 — kisa sifre */
   await test('A13', 'ADMIN_PASSWORD 12 karakterden kisa ise acilista hata', async () => {
-    const s = await sunucuBaslat({ ADMIN_PASSWORD: 'kisa' });
-    await s.durdur();
-    s.temizle();
-    bekle(!s.hazir, 'Kisa sifreye ragmen sunucu kalkti');
-    bekle(/en az \d+ karakter/i.test(s.cikti), `Beklenen hata mesaji yok: ${s.cikti.slice(-300)}`);
-    return { detay: 'acilista reddedildi' };
+    await acilisHatasi({ ADMIN_PASSWORD: 'kisa' }, /ADMIN_PASSWORD en az \d+ karakter/i);
+    return { detay: 'acilista reddedildi (temiz mesaj, exit 1)' };
   });
 
   /* A14 — SESSION_SECRET degisimi oturumu dusurur */
@@ -257,12 +276,11 @@ export async function calistir() {
 
   /* A16 — prod + secret yok */
   await test('A16', 'NODE_ENV=production + SESSION_SECRET yok → acilista hata', async () => {
-    const s = await sunucuBaslat({ NODE_ENV: 'production', SESSION_SECRET: '', ADMIN_PASSWORD: SIFRE });
-    await s.durdur();
-    s.temizle();
-    bekle(!s.hazir, 'SESSION_SECRET olmadan production kalkti');
-    bekle(/SESSION_SECRET/i.test(s.cikti), `Beklenen hata yok: ${s.cikti.slice(-300)}`);
-    return { detay: 'prod korumasi calisiyor' };
+    await acilisHatasi(
+      { NODE_ENV: 'production', SESSION_SECRET: '', ADMIN_PASSWORD: SIFRE },
+      /SESSION_SECRET tanimli degil.*openssl rand -hex 32/s,
+    );
+    return { detay: 'prod korumasi calisiyor (temiz mesaj, exit 1)' };
   });
 
   /* A17 — dev + secret yok */
@@ -276,31 +294,25 @@ export async function calistir() {
 
   /* A16b — prod + ADMIN_PASSWORD yok */
   await test('A16b', 'NODE_ENV=production + ADMIN_PASSWORD yok → acilista hata', async () => {
-    const s = await sunucuBaslat({ NODE_ENV: 'production', ADMIN_PASSWORD: '' });
-    await s.durdur();
-    s.temizle();
-    bekle(!s.hazir, 'ADMIN_PASSWORD olmadan production kalkti');
-    bekle(/ADMIN_PASSWORD/i.test(s.cikti), `Beklenen hata yok: ${s.cikti.slice(-300)}`);
-    return { detay: 'prod korumasi calisiyor' };
+    await acilisHatasi({ NODE_ENV: 'production', ADMIN_PASSWORD: '' }, /ADMIN_PASSWORD tanimli degil/i);
+    return { detay: 'prod korumasi calisiyor (temiz mesaj, exit 1)' };
   });
 
   /* A18 — gecersiz LOG_LEVEL */
   await test('A18', 'Gecersiz LOG_LEVEL acilista reddediliyor', async () => {
-    const s = await sunucuBaslat({ LOG_LEVEL: 'verbose' });
-    await s.durdur();
-    s.temizle();
-    bekle(!s.hazir, 'Gecersiz LOG_LEVEL ile kalkti');
-    bekle(/Ortam degiskenleri gecersiz/i.test(s.cikti), `Beklenen zod hatasi yok: ${s.cikti.slice(-300)}`);
-    return { detay: 'zod dogrulamasi calisiyor' };
+    await acilisHatasi({ LOG_LEVEL: 'verbose' }, /Ortam degiskenleri gecersiz:[\s\S]*LOG_LEVEL/);
+    return { detay: 'zod dogrulamasi calisiyor; hata degiskeni adiyla soyluyor' };
+  });
+  await test('A18b', 'Gecersiz NODE_ENV (orn. staging) acilista reddediliyor', async () => {
+    // Uc deger vardir: development | production | test. "staging" gibi bir
+    // deger prod korumalarini SESSIZCE devre disi birakmamali, durmali.
+    await acilisHatasi({ NODE_ENV: 'staging' }, /Ortam degiskenleri gecersiz:[\s\S]*NODE_ENV/);
+    return { detay: 'staging reddedildi' };
   });
 
   /* A19 — gecersiz PORT */
   await test('A19', 'Gecersiz PORT acilista reddediliyor', async () => {
-    const s = await sunucuBaslat({ PORT: '99999' });
-    await s.durdur();
-    s.temizle();
-    bekle(!s.hazir, 'PORT=99999 ile kalkti');
-    bekle(/Ortam degiskenleri gecersiz|PORT/i.test(s.cikti), `Beklenen hata yok: ${s.cikti.slice(-300)}`);
+    await acilisHatasi({ PORT: '99999' }, /Ortam degiskenleri gecersiz:[\s\S]*PORT/);
     return { detay: 'aralik dogrulamasi calisiyor' };
   });
 
@@ -356,11 +368,8 @@ export async function calistir() {
 
   /* A21b — gecersiz CORS_ORIGINS bicimi sunucuyu dusurmeli */
   await test('A21b', 'Gecersiz CORS_ORIGINS (yol iceren adres) sunucuyu dusuruyor', async () => {
-    return sunucuIle({ CORS_ORIGINS: 'http://localhost:5173/admin' }, async (s) => {
-      bekle(!s.hazir, 'Gecersiz CORS_ORIGINS ile kalkti');
-      bekle(/CORS_ORIGINS gecersiz/i.test(s.cikti), `Beklenen hata mesaji yok: ${s.cikti.slice(-300)}`);
-      return { detay: 'baslangicta reddedildi' };
-    });
+    await acilisHatasi({ CORS_ORIGINS: 'http://localhost:5173/admin' }, /CORS_ORIGINS gecersiz/i);
+    return { detay: 'baslangicta reddedildi' };
   });
 
   /* A21c — ayri origin varsa cerez SameSite=None + Secure olmali */
@@ -452,14 +461,90 @@ export async function calistir() {
     // Sema olmadan verilen adres ("alan.adi" gibi) eskiden ayar yuklenirken
     // sessizce ATILIYOR ve uyari "PUBLIC_BASE_URL ayarlayin" diyordu — deger
     // ayarli ama gecersizken yanlis teshis. Artik acilista acikca durmali.
-    const s = await sunucuBaslat({ ADMIN_PASSWORD: 'TestSifresi-1453!', PUBLIC_BASE_URL: 'ipa-ios.ornek.local' });
-    try {
-      bekle(!s.hazir, 'sunucu gecersiz PUBLIC_BASE_URL ile ayaga kalkmamaliydi');
-      bekle(/PUBLIC_BASE_URL/.test(s.cikti), `hata mesaji degiskeni soylemiyor:\n${s.cikti.slice(-300)}`);
-    } finally {
-      await s.durdur();
-      s.temizle();
-    }
+    await acilisHatasi({ ADMIN_PASSWORD: SIFRE, PUBLIC_BASE_URL: 'ipa-ios.ornek.local' }, /PUBLIC_BASE_URL/);
     return { detay: 'acilis hatasi + mesajda degisken adi' };
+  });
+
+  /* --- 2026-08-25: env senaryo matrisindeki bosluklar ---------------------- */
+
+  await test('A23', 'COOKIE_SAMESITE=none + COOKIE_SECURE=false acilista reddediliyor', async () => {
+    // Tarayici SameSite=None cerezini Secure olmadan yok sayar; sonuc
+    // kullaniciya "giris yapilamiyor" olarak gorunurdu. Acilista durmali.
+    await acilisHatasi(
+      { COOKIE_SAMESITE: 'none', COOKIE_SECURE: 'false' },
+      /COOKIE_SAMESITE=none ile COOKIE_SECURE=false birlikte kullanilamaz/,
+    );
+    return { detay: 'cerez kombinasyonu reddedildi' };
+  });
+
+  await test('A24', 'DATA_DIR yazilabilir degilse acilista temiz hata (ham EACCES stack trace yok)', async () => {
+    if (typeof process.getuid === 'function' && process.getuid() === 0) {
+      return { skip: true, detay: 'root olarak kosuyor; dizin izni engel olmaz' };
+    }
+    const kok = geciciDizin();
+    const veri = join(kok, 'veri');
+    chmodSync(kok, 0o500); // icine dizin olusturulamaz
+    try {
+      await acilisHatasi({}, /DATA_DIR yazilabilir degil .*EACCES/, { dataDir: veri });
+      return { detay: 'EACCES → "DATA_DIR yazilabilir degil (..., EACCES)"' };
+    } finally {
+      chmodSync(kok, 0o700);
+      dizinSil(kok);
+    }
+  });
+
+  await test('A25', 'ADMIN_PASSWORD yokken (dev): kalkar, /api/auth/me configured=false, login 503 + mesaj', async () => {
+    // Frontend'in "yapilandirilmamis" teshisini dayandirdigi TEK sinyal budur:
+    // sunucuya ulasildi VE configured=false. (Ulasilamama ise hic yanit yok /
+    // nginx 502 HTML — bkz. C14 ve frontend/src/api.test.ts.)
+    return sunucuIle({ ADMIN_PASSWORD: '' }, async (s) => {
+      bekle(s.hazir, `dev'de sifresiz kalkmali: ${s.cikti.slice(-300)}`);
+      const c = s.istemci();
+      const me = await c.get('/api/auth/me');
+      esit(me.status, 200, '/api/auth/me');
+      esit(me.govde.configured, false, 'configured');
+      esit(me.govde.authenticated, false, 'authenticated');
+
+      const giris = await c.post('/api/auth/login', { password: 'herhangi-bir-sey' });
+      esit(giris.status, 503, 'login');
+      bekle(/ADMIN_PASSWORD/.test(giris.govde?.error ?? ''), `503 mesaji degiskeni soylemiyor: ${JSON.stringify(giris.govde)}`);
+
+      // Yapilandirma eksikligi yetki katmanini GEVSETMEZ: korunan uclar 401.
+      esit((await c.get('/api/builds')).status, 401, '/api/builds');
+
+      await new Promise((r) => setTimeout(r, 300));
+      bekle(/Admin sifresi tanimli degil/.test(s.cikti), 'acilis loguna uyari dusmedi');
+      return { detay: 'configured=false, login 503 (ADMIN_PASSWORD), korunan uc 401, log uyarisi var' };
+    });
+  });
+
+  await test('A15', 'SESSION_SECRET degisimi imzali kurulum linklerini (manifest) dusuruyor', async () => {
+    // A14 oturum cerezini sinar; imzali URL'ler de ayni anahtarla HMAC'lenir
+    // (domain/links/token.ts). installd cerez tasimadigi icin kurulumun tek
+    // yetkisi bu imzadir — secret degisince eski linkler 403 olmali.
+    const dizin = geciciDizin();
+    const ortak = { ADMIN_PASSWORD: SIFRE, PUBLIC_BASE_URL: 'https://ota.test' };
+    try {
+      let yol;
+      await sunucuIle({ ...ortak, SESSION_SECRET: 'a'.repeat(64) }, async (s) => {
+        bekle(s.hazir, 'kalkmadi');
+        const c = s.istemci();
+        await c.post('/api/auth/login', { password: SIFRE });
+        const y = await c.yukle(join(FIX, 'demo-a.ipa'), { ttlHours: 24 });
+        esit(y.status, 201, 'yukleme');
+        const html = String((await c.get(`/i/${y.govde.build.token}`, IOS)).govde);
+        yol = manifestAdresiCikar(html).replace('https://ota.test', '');
+        esit((await c.get(yol)).status, 200, 'ayni secret ile manifest');
+      }, { dataDir: dizin });
+
+      return await sunucuIle({ ...ortak, SESSION_SECRET: 'b'.repeat(64) }, async (s) => {
+        bekle(s.hazir, 'kalkmadi');
+        const r = await s.istemci().get(yol);
+        esit(r.status, 403, 'farkli secret ile manifest');
+        return { detay: 'ayni imzali adres: eski secret 200, yeni secret 403' };
+      }, { dataDir: dizin });
+    } finally {
+      dizinSil(dizin);
+    }
   });
 }

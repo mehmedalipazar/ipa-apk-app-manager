@@ -155,6 +155,24 @@ export class Istemci {
   }
 }
 
+/* --- Kurulum sayfasi yardimcilari ---------------------------------------- */
+
+/**
+ * Kurulum sayfasi User-Agent e gore IKI FARKLI icerik uretir:
+ * iOS disi istemcide "yalnizca iPhone/iPad" uyarisi ve kurulum dugmesi YOK.
+ * itms-services linkini gorebilmek icin iOS UA sart.
+ */
+export const IOS_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+export const IOS = { headers: { 'user-agent': IOS_UA } };
+
+/** Kurulum sayfasindan (iOS goruntusu) imzali manifest adresini cikarir. */
+export function manifestAdresiCikar(html) {
+  const m = /href="itms-services:\/\/\?action=download-manifest&amp;url=([^"]+)"/.exec(html);
+  if (!m) throw new Error('Kurulum sayfasinda itms-services linki bulunamadi');
+  return decodeURIComponent(m[1].replace(/&amp;/g, '&'));
+}
+
 /* --- Izole sunucu ornegi -------------------------------------------------- */
 
 /**
@@ -215,7 +233,10 @@ export async function sunucuBaslat(env = {}, secenekler = {}) {
     taban,
     veriDizini,
     hazir,
-    cikisKodu,
+    // Getter: `durdur()` sonrasinda da guncel kalsin (snapshot degil).
+    get cikisKodu() {
+      return cikisKodu;
+    },
     get cikti() {
       return cikti;
     },

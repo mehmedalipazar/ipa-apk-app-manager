@@ -81,6 +81,14 @@ uzerinden kanitlamak. "Deger set edildi" yeterli degil — davranis degismeli.
 | A21b | Gecersiz `CORS_ORIGINS` | Yol iceren adres ver | Acilista hata, sunucu kalkmaz |
 | A21c | Ayri origin cerez politikasi | `CORS_ORIGINS` dolu iken giris yap | Cerez `HttpOnly; Secure; SameSite=None` |
 | A22 | Bilinmeyen degisken | `SACMA_DEGISKEN=1` | Yok sayilir, sunucu kalkar |
+| A18b | Gecersiz `NODE_ENV` | `NODE_ENV=staging` | zod hatasi, exit 1 (prod korumalari sessizce kapanmaz) |
+| A23 | `COOKIE_SAMESITE=none` + `COOKIE_SECURE=false` | Ikisini birlikte ver | Acilista hata, exit 1 (tarayici cerezi yok sayardi) |
+| A24 | `DATA_DIR` yazilamiyor | Ust dizin `chmod 500` | "Yapilandirma hatasi: DATA_DIR yazilabilir degil (..., EACCES)", stack trace yok |
+| A25 | `ADMIN_PASSWORD` yok (dev) | Sifresiz baslat | Kalkar; `/api/auth/me` `configured:false`; login **503** + mesajda `ADMIN_PASSWORD`; korunan uclar yine 401 |
+
+Acilis hatasi beklenen her senaryo (`acilisHatasi()` yardimcisi, 2026-08-25) ortak sozlesmeyi de
+sinar: **exit kodu 1**, mesaj tek bicimde `Yapilandirma hatasi: ...`, ciktida Node stack trace
+yok. Oncesinde `SESSION_SECRET`/zod/`DATA_DIR` hatalari dogru mesaji stack trace arasinda basiyordu.
 
 ## B. Docker Compose degisken aktarimi
 
@@ -117,7 +125,7 @@ uzerinden kanitlamak. "Deger set edildi" yeterli degil — davranis degismeli.
 | C11 | XHR yukleme ilerlemesi | Buyuk dosya yukle | `progress` olaylari, yuzde artar |
 | C12 | Yukleme iptali | Iptal dugmesi | `abort` → 'Yukleme iptal edildi' |
 | C13 | `warnings` dizisi tasinmasi | baseUrl'i http yap | Uyari hem settings hem upload yanitinda |
-| C14 | Ag kopmasi | Backend'i durdur → istek | 'Sunucuya baglanilamadi' |
+| C14 | Tasima katmani (backend kapali) | `frontend/src/api.test.ts` — vitest, `fetch` taklidi; suite C icinden kosulur | nginx 502/503/504 **HTML** → "Sunucuya ulasilamiyor (HTTP n)"; `TypeError` → "Sunucuya baglanilamadi"; JSON `{error}` tasiyan 4xx/5xx (orn. login 503 `ADMIN_PASSWORD`) → mesaj birebir, **ulasilamama sayilmaz** |
 | C15 | `content-type` gonderimi | Govdeli istekler | `application/json` |
 | C16 | Onbellek disi kurulum sayfasi | `/i/:token` | `cache-control: no-store` |
 
@@ -215,9 +223,28 @@ Her alan icin: **gecerli deger**, **sinir alti**, **sinir ustu**, **kalicilik (F
 ```bash
 # Otomatik API + env + docker suiti
 node tests/run-suite.mjs                 # arka uc 3000, arayuz 5173
-node tests/run-suite.mjs --docker        # docker container'a karsi
+node tests/run-suite.mjs A C             # izole sunucu gruplari (C14 frontend vitest'ini de kosar)
+
+# Yalnizca frontend tasima katmani (fetch taklidi, ~150 ms)
+cd frontend && npm test
 
 # Tarayici (Chrome DevTools MCP) senaryolari: C, D, E, F gorsel adimlari
+```
+
+### Hata hangi katmanda dogdu? — uc katman, uc teknik
+
+| Katman | Nerede | Gozlemlenebilir cikti | Teknik | Suite |
+|---|---|---|---|---|
+| Acilis (env) | `config/env.ts` zod, `auth.bootstrap`, `DATA_DIR` | exit 1 + `Yapilandirma hatasi: ...`; `/healthz` hic kalkmaz | izole process spawn, `cikisKodu` + `cikti` | A (`acilisHatasi()`) |
+| Calisma zamani (API) | route `reply.code(4xx/5xx).send({error})` / `AppError` | HTTP durum + `{error, field?}` JSON | HTTP istek, status + mesaj metni pinlenir | C (D/F/G/H) |
+| Tasima (ulasilamama) | fetch'in kendisi (ag/DNS/CORS) ya da ters proxy 502/503/504 HTML | `TypeError` ya da JSON olmayan 5xx — **backend bunu hic gormez** | `fetch` taklidi ile frontend eslemesi | C14 → `frontend/src/api.test.ts` |
+
+Elle deneme (dosya okumadan, ortam sifirdan):
+
+```bash
+cd backend && env -i PATH="$PATH" HOME="$HOME" NODE_ENV=production PORT=3911 DATA_DIR=/tmp/deneme \
+  node --experimental-strip-types --no-warnings src/index.ts; echo "exit=$?"
+cd backend && ADMIN_PASSWORD= docker compose --env-file /dev/null config   # compose zorunlu degisken
 ```
 
 Sonuc raporu: `tests/reports/`

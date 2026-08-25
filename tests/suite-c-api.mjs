@@ -4,10 +4,12 @@
  * D/F/G izole bir sunucu ornegine karsi calisir (kullanicinin DB si kirlenmez).
  * C grubu canli arka uc ornegini hedefler (varsayilan http://localhost:3000).
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { grup, test, bekle, esit, sunucuBaslat, sunucuIle, Istemci, KOK, uyu } from './lib/harness.mjs';
+import {
+  grup, test, bekle, esit, sunucuBaslat, sunucuIle, Istemci, KOK, uyu, IOS, IOS_UA, manifestAdresiCikar,
+} from './lib/harness.mjs';
 
 const SIFRE = 'TestSifresi-1453!';
 const FIX = join(KOK, 'tests/fixtures');
@@ -15,22 +17,6 @@ const FIX = join(KOK, 'tests/fixtures');
 // 2026-08-13 ayriminda kok node_modules kalkti; better-sqlite3 artik yalnizca
 // backend/node_modules altinda. Testler onu backend'in cozumleyicisiyle bulur.
 const backendRequire = createRequire(join(KOK, 'backend/package.json'));
-
-/**
- * Kurulum sayfasi User-Agent e gore IKI FARKLI icerik uretir:
- * iOS disi istemcide "yalnizca iPhone/iPad" uyarisi ve kurulum dugmesi YOK.
- * itms-services linkini gorebilmek icin iOS UA sart.
- */
-const IOS_UA =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-const IOS = { headers: { 'user-agent': IOS_UA } };
-
-/** Kurulum sayfasindan (iOS goruntusu) imzali manifest adresini cikarir. */
-function manifestAdresiCikar(html) {
-  const m = /href="itms-services:\/\/\?action=download-manifest&amp;url=([^"]+)"/.exec(html);
-  if (!m) throw new Error('Kurulum sayfasinda itms-services linki bulunamadi');
-  return decodeURIComponent(m[1].replace(/&amp;/g, '&'));
-}
 
 /** Sunucu semasindaki ayar alanlari — frontend tipiyle karsilastirmak icin. */
 const BEKLENEN_ALANLAR = [
@@ -134,6 +120,36 @@ export async function calistir({ taban }) {
     // 404 sayfasinda da, gecerli sayfada da onbellek disi olmali; gecerli
     // sayfa F5 te ayrica dogrulanir.
     return { detay: `404 sayfasi status=${r.status}`, };
+  });
+
+  await test('C14', 'Tasima katmani: frontend request() eslemesi (backend kapali / 502 HTML / TypeError)', async () => {
+    // Bu katman backend calistirilarak test EDILEMEZ: "nginx 502 + HTML govde"
+    // ve "fetch'in kendisi patladi (ag/DNS/CORS)" senaryolarinda backend yoktur.
+    // Esleme (`request()`, `baglantiHatasiMi()`) frontend/src/api.test.ts
+    // icinde fetch taklit edilerek pinlenir; buradan kosulur ki tek bir
+    // `run-suite` cagrisi uc katmani da (acilis / API / tasima) kapsasin.
+    // 2026-08-25: kapali backend "ADMIN_PASSWORD tanimlanmamis" diye
+    // raporlaniyordu — bu katmanin testi yoktu.
+    const vitest = join(KOK, 'frontend/node_modules/.bin/vitest');
+    if (!existsSync(vitest)) {
+      return { skip: true, detay: 'frontend/node_modules yok (cd frontend && npm install)' };
+    }
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync(vitest, ['run', '--reporter=json'], {
+      cwd: join(KOK, 'frontend'),
+      encoding: 'utf8',
+      env: { ...process.env, CI: '1' },
+      timeout: 120_000,
+    });
+    const basi = r.stdout.indexOf('{');
+    bekle(basi >= 0, `vitest JSON raporu uretmedi:\n${r.stdout.slice(-600)}${r.stderr.slice(-600)}`);
+    const rapor = JSON.parse(r.stdout.slice(basi));
+    bekle(
+      r.status === 0 && rapor.success,
+      `vitest basarisiz (${rapor.numFailedTests} hata):\n${r.stdout.slice(-800)}${r.stderr.slice(-400)}`,
+    );
+    bekle(rapor.numTotalTests >= 10, `beklenenden az test kostu: ${rapor.numTotalTests}`);
+    return { detay: `${rapor.numPassedTests}/${rapor.numTotalTests} gecti (frontend/src/api.test.ts)` };
   });
 
   /* ===================================================================== */
