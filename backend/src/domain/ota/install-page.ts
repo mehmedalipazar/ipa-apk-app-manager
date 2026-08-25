@@ -83,6 +83,11 @@ ol li:last-child { margin-bottom: 0; }
 .notice { border-radius: 12px; padding: 13px 15px; font-size: 14px; margin-top: 18px; }
 .notice.warn { background: var(--warn-bg); color: var(--warn-fg); }
 .notice.err  { background: var(--err-bg);  color: var(--err-fg); }
+.safari-menu-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  margin-right: 5px; border: 1px solid currentColor; border-radius: 7px; font-size: 12px;
+  font-weight: 700; line-height: 1; vertical-align: -7px;
+}
 .qr { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .qr img { width: 210px; height: 210px; background: #fff; border-radius: 12px; padding: 10px; }
 .field {
@@ -191,6 +196,10 @@ export function renderInstallPage(input: InstallPageInput): string {
     const ipadKurulum = input.installUrl
       ? `<div id="ipad-kurulum" hidden>
            <a class="btn" href="${escapeHtml(input.installUrl)}">Uygulamayi Yukle</a>
+           <div class="notice warn">
+             Uygulamayı Yükle butonu gözükmüyorsa Safari adres çubuğunun hemen solundaki butona
+             dokunun ve üç noktaya basın ardından <strong>Mobil Web Sitesi</strong>'ni seçin.
+           </div>
          </div>
          <script>
          (function () {

@@ -1100,6 +1100,8 @@ export async function calistir({ taban }) {
       bekle(govde.includes('id="ipad-kurulum"'), 'gizli iPad kurulum blogu yok');
       bekle(/itms-services:/.test(govde), 'iPad blogunda itms-services linki yok');
       bekle(/maxTouchPoints/.test(govde), 'dokunmatik tespit betigi yok');
+      bekle(/safari-menu-icon/.test(govde), 'Safari menusu simgesi yok');
+      bekle(/Mobil Web Sitesini Isteyin/.test(govde), 'mobil web sitesi talimatı yok');
       // iPhone gorunumu eskisi gibi dogrudan buton icermeli.
       const tel = String((await c.get(`/i/${b.token}`, IOS)).govde);
       bekle(/itms-services:/.test(tel), 'iPhone gorunumunde buton yok');
