@@ -128,3 +128,23 @@ export const IconApple = ({ size = 22, className }: Props) => (
     <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.79-3.33.79-.68 0-1.74-.77-2.87-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.75.73 1.06 1.6 2.24 2.74 2.2 1.1-.05 1.52-.71 2.85-.71s1.7.71 2.87.69c1.19-.02 1.94-1.07 2.66-2.13.84-1.22 1.19-2.4 1.2-2.46-.03-.01-2.3-.88-2.33-3.52zM14.9 5.9c.6-.73 1.01-1.75.9-2.76-.87.03-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.07 1.96-.49 2.57-1.22z" />
   </svg>
 );
+
+/**
+ * Android robot basi: yarim disk kafa, iki goz (evenodd ile delik) ve iki anten.
+ * 12 px'te de okunsun diye geometri kaba tutuldu.
+ */
+export const IconAndroid = ({ size = 22, className }: Props) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path
+      fillRule="evenodd"
+      d="M4.5 15.5a7.5 7.5 0 0 1 15 0v1h-15zM8 12a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0zm5.6 0a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0z"
+    />
+    <path
+      d="M7.8 10 5.6 6.6M16.2 10l2.2-3.4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);

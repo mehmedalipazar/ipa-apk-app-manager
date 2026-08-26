@@ -1,5 +1,6 @@
 /**
- * C/D/F/G/H gruplari — haberlesme sozlesmesi, ayar alanlari, OTA akisi, kimlik, regresyonlar.
+ * C/D/F/G/H/I gruplari — haberlesme sozlesmesi, ayar alanlari, OTA akisi, kimlik,
+ * regresyonlar, Android APK.
  *
  * Acilis blogu (C1/C2/C3/C5/C16) CANLI `--taban` ornegini hedefler (varsayilan
  * http://localhost:3000 — bu Mac'te URETIM api container'i; ayakta olmali).
@@ -8,11 +9,13 @@
  * "C — Sozlesme (izole sunucu)" izole bir sunucu ornegine karsi calisir
  * (kullanicinin DB'si kirlenmez).
  */
+import { createHmac } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import {
   grup, test, bekle, esit, sunucuBaslat, sunucuIle, Istemci, KOK, uyu, IOS, IOS_UA, manifestAdresiCikar,
+  ANDROID, ANDROID_UA, apkAdresiCikar,
 } from './lib/harness.mjs';
 
 const SIFRE = 'TestSifresi-1453!';
@@ -1152,6 +1155,333 @@ export async function calistir({ taban }) {
       bekle(!/Safari/.test(tel), 'iPhone sayfasinda "Safari" ifadesi kalmamali');
       await c.del(`/api/builds/${b.id}`);
       return { detay: 'Macintosh UA: gizli buton + tespit betigi + gorunur "Mobil Web Sitesi" talimati' };
+    });
+
+    /* --------------------------------------------------------------- */
+    grup('I — Android APK');
+
+    // Harness'in SESSION_SECRET'i sabittir ('test' x16); imza token.ts ile ayni
+    // bicimde uretilir: HMAC-SHA256(secret, token \0 amac \0 exp), base64url.
+    // Ayirici NUL baytidir (token.ts bu yuzden git'te "binary" gorunur).
+    // Boylece amac (purpose) izolasyonu dogrudan kanitlanir: 'ipa' anahtari
+    // app.apk'yi acmamali, capraz platform rotalari 404 olmali.
+    const imzaAnahtari = (token, amac, omurMs = 60_000) => {
+      const exp = Date.now() + omurMs;
+      const imza = createHmac('sha256', 'test'.repeat(16))
+        .update(`${token}\0${amac}\0${exp}`)
+        .digest('base64url');
+      return `${exp}.${imza}`;
+    };
+    const anahtarli = (yol, token, amac) => `${yol}?k=${encodeURIComponent(imzaAnahtari(token, amac))}`;
+    const APK = join(FIX, 'demo-android.apk');
+    const PNG_IMZA = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+    let apkBuild = null;
+    let apkYolu = null;
+
+    await test('I1', 'demo-android.apk yukleniyor; DTO platform + meta veri dogru', async () => {
+      const y = await c.yukle(APK, { ttlHours: 48, note: 'I1 testi' });
+      esit(y.status, 201, `status (${JSON.stringify(y.govde).slice(0, 200)})`);
+      const b = y.govde.build;
+      esit(b.platform, 'android', 'platform');
+      esit(b.bundleId, 'com.ankageo.demoandroid', 'bundleId');
+      // Etiket resources.arsc'den cozulur; values-tr varyanti varsayilani YENMEMELI.
+      esit(b.appName, 'Demo Android', 'appName');
+      esit(b.version, '1.2.0', 'version (versionName)');
+      esit(b.buildNumber, '12', 'buildNumber (versionCode)');
+      esit(b.minOsVersion, '24', 'minOsVersion (minSdkVersion)');
+      esit(b.platforms.join(','), 'Android', 'platforms');
+      esit(b.originalFilename, 'demo-android.apk', 'originalFilename');
+      bekle(/\/icon\.png\?k=/.test(b.iconUrl ?? ''), `iconUrl beklenmedik: ${b.iconUrl}`);
+      esit(b.installUrl, `https://ota.test/i/${b.token}`, 'installUrl');
+      bekle(/^[0-9a-f]{64}$/.test(b.sha256), 'sha256 bicimi yanlis');
+      apkBuild = b;
+      return { detay: `${b.appName} ${b.version} (${b.sizeLabel})` };
+    });
+
+    await test('I2', 'APK simgesi: en yuksek yogunluklu PNG secildi, adaptive XML atlandi', async () => {
+      bekle(apkBuild?.iconUrl, 'I1 basarisiz ya da iconUrl yok');
+      const r = await c.get(apkBuild.iconUrl.replace('https://ota.test', ''), { ham: true });
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('content-type'), 'image/png', 'content-type');
+      bekle(r.govde.subarray(0, 8).equals(PNG_IMZA), 'PNG imzasi yok');
+      // mdpi 48px + xxhdpi 144px + anydpi-v26 XML arasindan 144px PNG secilmeli.
+      esit(r.govde.readUInt32BE(16), 144, 'IHDR genislik');
+      return { detay: `${r.govde.length} bayt PNG, 144px` };
+    });
+
+    await test('I3', 'Android UA: indirme butonu + Android adimlari; itms/QR yok', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const r = await c.get(`/i/${apkBuild.token}`, ANDROID);
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('cache-control'), 'no-store, must-revalidate', 'cache-control');
+      const html = String(r.govde);
+      for (const beklenen of ['app.apk?k=', 'Uygulamayi Indir', 'Bilinmeyen uygulamalari yukle', 'En az Android', '7.0 (API 24)']) {
+        bekle(html.includes(beklenen), `sayfada yok: ${beklenen}`);
+      }
+      for (const olmamali of ['itms-services', 'qr.svg', 'Safari', 'ipad-kurulum']) {
+        bekle(!html.includes(olmamali), `sayfada olmamali: ${olmamali}`);
+      }
+      return { detay: 'indirme butonu + adimlar; itms/QR/iPad blogu yok' };
+    });
+
+    await test('I4', 'Android disi UA (masaustu): uyari + QR + indirme butonu', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const html = String((await c.get(`/i/${apkBuild.token}`)).govde);
+      bekle(html.includes('id="android-uyari"'), 'android uyarisi yok');
+      bekle(/yalnizca <strong>Android<\/strong>/.test(html), 'uyari metni yok');
+      bekle(html.includes('qr.svg'), 'masaustu goruntusunde QR yok');
+      bekle(html.includes('app.apk?k='), 'indirme butonu yok');
+      bekle(!html.includes('itms-services'), 'itms-services sizdi');
+      bekle(!html.includes('id="ipad-kurulum"'), 'iPad blogu Android sayfasinda olmamali');
+      return { detay: 'uyari + QR + buton' };
+    });
+
+    await test('I4b', 'iPhone UA ile APK sayfasi da Android disi gorunum', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const html = String((await c.get(`/i/${apkBuild.token}`, IOS)).govde);
+      bekle(!html.includes('itms-services'), 'itms-services sizdi');
+      bekle(html.includes('app.apk?k='), 'indirme butonu yok');
+      bekle(html.includes('id="android-uyari"'), 'android uyarisi yok');
+      return { detay: 'iPhone UA: uyari + buton' };
+    });
+
+    await test('I5', 'iOS surumu Android UA altinda degismiyor', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      esit(y.status, 201, 'upload');
+      const html = String((await c.get(`/i/${y.govde.build.token}`, ANDROID)).govde);
+      bekle(html.includes('id="ipad-kurulum"'), 'iOS sayfasinin gizli iPad blogu yok');
+      bekle(/yalnizca <strong>iPhone ve iPad<\/strong>/.test(html), 'iOS disi uyarisi yok');
+      bekle(!html.includes('app.apk'), 'iOS sayfasinda app.apk olmamali');
+      await c.del(`/api/builds/${y.govde.build.id}`);
+      return { detay: 'iOS sayfasi Android UA ile eski davranis' };
+    });
+
+    await test('I6', 'app.apk indirme: imzali 200 + basliklar', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const html = String((await c.get(`/i/${apkBuild.token}`, ANDROID)).govde);
+      const u = new URL(apkAdresiCikar(html));
+      apkYolu = u.pathname + u.search;
+      bekle(apkYolu.startsWith(`/i/${apkBuild.token}/app.apk?k=`), apkYolu);
+      const r = await c.get(apkYolu, { ham: true });                                            // sayilir (1)
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('content-type'), 'application/vnd.android.package-archive', 'content-type');
+      bekle(/attachment; filename="Demo_Android-1\.2\.0\.apk"/.test(r.headers.get('content-disposition') ?? ''),
+        `content-disposition: ${r.headers.get('content-disposition')}`);
+      esit(Number(r.headers.get('content-length')), apkBuild.sizeBytes, 'content-length');
+      esit(r.headers.get('accept-ranges'), 'bytes', 'accept-ranges');
+      bekle(r.govde.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])), 'ZIP (PK) imzasi yok');
+      return { detay: `${r.govde.length} bayt indirildi` };
+    });
+
+    await test('I7', 'app.apk Range / HEAD / 416 + indirme sayaci', async () => {
+      bekle(apkYolu, 'I6 basarisiz');
+      const boyut = apkBuild.sizeBytes;
+      const parca = await c.get(apkYolu, { ham: true, headers: { range: 'bytes=0-1023' } });      // sayilir (2)
+      esit(parca.status, 206, 'bytes=0-1023');
+      esit(parca.headers.get('content-range'), `bytes 0-1023/${boyut}`, 'content-range');
+      esit(parca.govde.length, 1024, 'parca boyutu');
+      const son = await c.get(apkYolu, { ham: true, headers: { range: 'bytes=-500' } });          // sayilmaz
+      esit(son.status, 206, 'bytes=-500');
+      esit(son.govde.length, 500, 'son 500 bayt');
+      const dis = await c.get(apkYolu, { ham: true, headers: { range: 'bytes=99999999-' } });    // sayilmaz
+      esit(dis.status, 416, 'aralik disi 416');
+      esit(dis.headers.get('content-range'), `bytes */${boyut}`, '416 content-range');
+      esit((await c.istek(apkYolu, { method: 'HEAD' })).status, 200, 'HEAD');                    // sayilmaz
+      const dto = (await c.get(`/api/builds/${apkBuild.id}`)).govde;
+      esit(dto.downloadCount, 2, 'downloadCount (I6 tam + bastan parca)');
+      return { detay: '206 / 206 / 416 / HEAD; sayac 2' };
+    });
+
+    await test('I8', 'Imza amaci izole: ipa/icon anahtari app.apk acmiyor, apk anahtari aciyor', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const yol = `/i/${apkBuild.token}/app.apk`;
+      esit((await c.get(anahtarli(yol, apkBuild.token, 'ipa'))).status, 403, 'ipa anahtari');
+      esit((await c.get(anahtarli(yol, apkBuild.token, 'icon'))).status, 403, 'icon anahtari');
+      esit((await c.get(anahtarli(yol, apkBuild.token, 'apk'), { ham: true })).status, 200, 'apk anahtari');
+      esit((await c.get(yol)).status, 403, 'anahtarsiz');
+      esit((await c.get(`${yol}?k=9999999999999.SAHTEIMZA`)).status, 403, 'bozuk anahtar');
+      return { detay: '403 / 403 / 200 / 403 / 403' };
+    });
+
+    await test('I9', 'Platform capraz rotalar 404: manifest.plist, app.ipa, icon.webp; iOS kaydinda app.apk', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const t = apkBuild.token;
+      const manifest = await c.get(anahtarli(`/i/${t}/manifest.plist`, t, 'manifest'));
+      esit(manifest.status, 404, 'android kaydinda manifest.plist');
+      esit(manifest.govde?.error, 'Bulunamadi', 'manifest govdesi');
+      esit((await c.get(anahtarli(`/i/${t}/app.ipa`, t, 'ipa'))).status, 404, 'android kaydinda app.ipa');
+      esit((await c.get(anahtarli(`/i/${t}/icon.webp`, t, 'icon'))).status, 404, 'png simgeli kayitta icon.webp');
+
+      const y = await c.yukle(join(FIX, 'demo-a.ipa'));
+      const ios = y.govde.build;
+      esit((await c.get(anahtarli(`/i/${ios.token}/app.apk`, ios.token, 'apk'))).status, 404, 'ios kaydinda app.apk');
+      await c.del(`/api/builds/${ios.id}`);
+      return { detay: 'dort capraz rota da 404' };
+    });
+
+    await test('I10', 'Iptal: APK sayfasi 410, app.apk 410; yeniden ac 200', async () => {
+      bekle(apkYolu, 'I6 basarisiz');
+      const r = await c.patch(`/api/builds/${apkBuild.id}`, { revoked: true });
+      esit(r.status, 200, 'revoke');
+      esit(r.govde.status, 'revoked', 'DTO status');
+      esit(r.govde.iconUrl, null, 'iconUrl');
+      const sayfa = await c.get(`/i/${apkBuild.token}`, ANDROID);
+      esit(sayfa.status, 410, 'sayfa');
+      bekle(!String(sayfa.govde).includes('app.apk'), '410 sayfasinda indirme linki olmamali');
+      esit((await c.get(apkYolu, { ham: true })).status, 410, 'app.apk');
+      const geri = await c.patch(`/api/builds/${apkBuild.id}`, { revoked: false });
+      esit(geri.govde.status, 'active', 'unrevoke');
+      esit((await c.get(`/i/${apkBuild.token}`, ANDROID)).status, 200, 'sayfa tekrar 200');
+      return { detay: '410 → 200' };
+    });
+
+    await test('I11', 'Temizlik: purged APK 410, dosyalar silinmis', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.apk'), { ttlHours: 1 });
+      esit(y.status, 201, 'upload');
+      const b = y.govde.build;
+      const Database = backendRequire('better-sqlite3');
+      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 100_000_000, b.id);
+      db.close();
+
+      await ayarla({ purgeAfterExpiryHours: 0 });
+      try {
+        const t = await c.post('/api/maintenance/cleanup');
+        esit(t.status, 200, 'cleanup');
+        bekle(t.govde.purged >= 1, `hicbir sey silinmedi: ${JSON.stringify(t.govde)}`);
+        esit((await c.get(`/api/builds/${b.id}`)).govde.status, 'purged', 'status');
+        esit((await c.get(`/i/${b.token}`, ANDROID)).status, 410, 'sayfa');
+        esit((await c.get(anahtarli(`/i/${b.token}/app.apk`, b.token, 'apk'))).status, 410, 'app.apk');
+        esit(existsSync(join(s.veriDizini, 'uploads', b.id)), false, 'yukleme klasoru silinmeli');
+      } finally {
+        await ayarla({ purgeAfterExpiryHours: 24 });
+      }
+      return { detay: 'purged: sayfa 410, apk 410, klasor yok' };
+    });
+
+    await test('I12', 'revokePreviousOnUpload platforma ozel: iOS ve Android birbirini kapatmiyor', async () => {
+      await ayarla({ revokePreviousOnUpload: true });
+      const idler = [];
+      try {
+        const a1 = (await c.yukle(join(FIX, 'demo-a.ipa'))).govde.build;
+        idler.push(a1.id);
+        const b1y = await c.yukle(join(FIX, 'demo-a.apk'));
+        const b1 = b1y.govde.build;
+        idler.push(b1.id);
+        esit(b1.bundleId, a1.bundleId, 'fikstur on kosulu: ayni paket kimligi');
+        esit(b1y.govde.revokedPrevious, 0, 'APK, IPA linkini iptal etmemeli');
+        esit((await c.get(`/api/builds/${a1.id}`)).govde.status, 'active', 'A1 aktif');
+
+        const b2y = await c.yukle(join(FIX, 'demo-a.apk'));
+        idler.push(b2y.govde.build.id);
+        bekle(b2y.govde.revokedPrevious >= 1, `ikinci APK oncekini iptal etmeli: ${b2y.govde.revokedPrevious}`);
+        esit((await c.get(`/api/builds/${b1.id}`)).govde.status, 'revoked', 'B1 revoked');
+        esit((await c.get(`/api/builds/${a1.id}`)).govde.status, 'active', 'A1 hala aktif');
+
+        const a2y = await c.yukle(join(FIX, 'demo-a.ipa'));
+        idler.push(a2y.govde.build.id);
+        esit((await c.get(`/api/builds/${a1.id}`)).govde.status, 'revoked', 'A1 ikinci IPA ile revoked');
+        esit((await c.get(`/api/builds/${b2y.govde.build.id}`)).govde.status, 'active', 'B2 hala aktif');
+      } finally {
+        await ayarla({ revokePreviousOnUpload: false });
+        for (const id of idler) await c.del(`/api/builds/${id}`);
+      }
+      return { detay: 'capraz platform iptali yok; ayni platformda var' };
+    });
+
+    await test('I13', 'Liste platform filtresi; gecersiz deger 400; search platformlar arasi', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      const andr = await c.get('/api/builds?platform=android&limit=200');
+      esit(andr.status, 200, 'android');
+      bekle(andr.govde.items.length >= 1 && andr.govde.items.every((b) => b.platform === 'android'), 'android filtresi karisik');
+      bekle(andr.govde.items.some((b) => b.id === apkBuild.id), 'apkBuild android listesinde yok');
+      const ios = await c.get('/api/builds?platform=ios&limit=200');
+      bekle(ios.govde.items.every((b) => b.platform === 'ios'), 'ios filtresi karisik');
+      esit((await c.get('/api/builds?platform=windows')).status, 400, 'gecersiz platform');
+      const ara = await c.get('/api/builds?search=demoandroid');
+      bekle(ara.govde.items.some((b) => b.id === apkBuild.id), 'search APK kaydini bulamadi');
+      return { detay: `android ${andr.govde.items.length}, ios ${ios.govde.items.length}` };
+    });
+
+    await test('I14', 'bozuk.apk 422 (ZIP degil)', async () => {
+      const r = await c.yukle(join(FIX, 'bozuk.apk'));
+      esit(r.status, 422, 'status');
+      bekle(/ZIP|arsiv/i.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error.slice(0, 70) };
+    });
+
+    await test('I15', 'zip-ama-apk-degil.apk 422 (AndroidManifest.xml yok)', async () => {
+      const r = await c.yukle(join(FIX, 'zip-ama-apk-degil.apk'));
+      esit(r.status, 422, 'status');
+      bekle(/AndroidManifest/.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error.slice(0, 70) };
+    });
+
+    await test('I15b', 'Yanlis uzanti mesaji .ipa ve .apk yi birlikte aniyor', async () => {
+      const r = await c.yukle(join(KOK, 'backend/package.json'));
+      esit(r.status, 400, 'status');
+      bekle(/\.ipa/.test(r.govde.error) && /\.apk/.test(r.govde.error), r.govde.error);
+      return { detay: r.govde.error };
+    });
+
+    await test('I16', 'demo-a.apk: literal etiket, simgesiz, minSdk 21, arsc yok', async () => {
+      const y = await c.yukle(join(FIX, 'demo-a.apk'));
+      esit(y.status, 201, `status (${JSON.stringify(y.govde).slice(0, 200)})`);
+      const b = y.govde.build;
+      esit(b.appName, 'DemoA Android', 'appName');
+      esit(b.iconUrl, null, 'iconUrl');
+      esit(b.minOsVersion, '21', 'minOsVersion');
+      esit(b.bundleId, 'com.ankageo.demoa', 'bundleId');
+      const html = String((await c.get(`/i/${b.token}`, ANDROID)).govde);
+      bekle(html.includes('class="icon placeholder"'), 'simge yer tutucusu yok');
+      bekle(html.includes('5.0 (API 21)'), 'En az Android 5.0 (API 21) yok');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'literal etiket + yer tutucu simge' };
+    });
+
+    await test('I17', 'demo-webp.apk: webp simge icon.webp olarak sunuluyor', async () => {
+      const dosya = join(FIX, 'demo-webp.apk');
+      if (!existsSync(dosya)) return { skip: true, detay: 'demo-webp.apk fiksturu yok' };
+      const y = await c.yukle(dosya);
+      esit(y.status, 201, `status (${JSON.stringify(y.govde).slice(0, 200)})`);
+      const b = y.govde.build;
+      bekle(/\/icon\.webp\?k=/.test(b.iconUrl ?? ''), `iconUrl beklenmedik: ${b.iconUrl}`);
+      const yol = b.iconUrl.replace('https://ota.test', '');
+      const r = await c.get(yol, { ham: true });
+      esit(r.status, 200, 'status');
+      esit(r.headers.get('content-type'), 'image/webp', 'content-type');
+      esit(r.govde.subarray(0, 4).toString('ascii'), 'RIFF', 'RIFF');
+      esit(r.govde.subarray(8, 12).toString('ascii'), 'WEBP', 'WEBP');
+      esit((await c.get(yol.replace('icon.webp', 'icon.png'))).status, 404, 'webp simgeli kayitta icon.png');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: `${r.govde.length} bayt webp` };
+    });
+
+    await test('I18', 'Sifreli APK linki: form, yanlis sifre, dogru sifrede indirme linki', async () => {
+      const y = await c.yukle(APK, { password: 'apk-sifre' });
+      esit(y.status, 201, 'upload');
+      const b = y.govde.build;
+      const acik = new Istemci(s.taban);
+      const form = String((await acik.get(`/i/${b.token}`, ANDROID)).govde);
+      bekle(/type="password"/.test(form), 'sifre formu yok');
+      bekle(!form.includes('app.apk?k='), 'sifresiz sayfada indirme linki gorunuyor!');
+      const basliklar = { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': ANDROID_UA };
+      const yanlis = await acik.istek(`/i/${b.token}`, { method: 'POST', headers: basliklar, body: 'password=yanlis' });
+      bekle(/hatali/i.test(String(yanlis.govde)), 'yanlis sifre mesaji yok');
+      const dogru = await acik.istek(`/i/${b.token}`, { method: 'POST', headers: basliklar, body: 'password=apk-sifre' });
+      bekle(String(dogru.govde).includes('app.apk?k='), 'dogru sifrede indirme linki cikmadi');
+      await c.del(`/api/builds/${b.id}`);
+      return { detay: 'sifre korumasi APK icin de calisiyor' };
+    });
+
+    await test('I19', 'Kalici silme: APK kaydi ve dosyalari gidiyor, 404', async () => {
+      bekle(apkBuild, 'I1 basarisiz');
+      esit((await c.del(`/api/builds/${apkBuild.id}`)).status, 200, 'delete');
+      esit((await c.get(`/api/builds/${apkBuild.id}`)).status, 404, 'GET 404');
+      esit((await c.get(`/i/${apkBuild.token}`, ANDROID)).status, 404, 'sayfa 404');
+      esit(existsSync(join(s.veriDizini, 'uploads', apkBuild.id)), false, 'yukleme klasoru silinmeli');
+      return { detay: 'tamamen silindi' };
     });
 
     /* --------------------------------------------------------------- */

@@ -1,7 +1,7 @@
 /**
  * Surum yonetimi — listeleme, duzenleme, silme. Tumu oturum ister.
  *
- *   GET    /api/builds       listele (limit/offset/search/onlyActive)
+ *   GET    /api/builds       listele (limit/offset/search/onlyActive/platform)
  *   GET    /api/builds/:id   tek kayit
  *   PATCH  /api/builds/:id   sure / iptal / not / sifre duzenle
  *   DELETE /api/builds/:id   kaydi ve dosyalarini sil
@@ -12,6 +12,7 @@ import type { AppContainer } from '../../container.ts';
 import type { AppModule } from '../../shared/module.types.ts';
 import { guarded } from '../auth/auth.guard.ts';
 import { MAX_TTL_HOURS } from '../../config/settings.schema.ts';
+import { PLATFORMS } from '../../domain/package/types.ts';
 import { UploadError } from '../../shared/errors.ts';
 import { hashPassword } from '../auth/password.ts';
 import { toBuildDto } from './build.dto.ts';
@@ -20,6 +21,8 @@ const ListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   search: z.string().optional(),
+  /** 'ios' | 'android' — verilmezse iki platform da listelenir. */
+  platform: z.enum(PLATFORMS).optional(),
   onlyActive: z
     .enum(['true', 'false'])
     .optional()
@@ -51,6 +54,7 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       limit: q.data.limit,
       offset: q.data.offset,
       search: q.data.search,
+      platform: q.data.platform,
       includeInactive: !q.data.onlyActive,
     });
 

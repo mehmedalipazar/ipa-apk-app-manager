@@ -1,8 +1,8 @@
 /** Ekranlar arasinda paylasilan kucuk parcalar. */
 import { useState, type ReactNode } from 'react';
-import { IconCheck, IconCopy, IconWarn } from './icons.tsx';
+import { IconAndroid, IconApple, IconCheck, IconCopy, IconWarn } from './icons.tsx';
 import { useToast } from './Toast.tsx';
-import type { BuildStatus } from '../api.ts';
+import type { BuildStatus, Platform } from '../api.ts';
 
 export function Alert({
   kind,
@@ -43,6 +43,16 @@ export function StatusBadge({ status, label }: { status: BuildStatus; label: str
     <span className={`badge ${status}`}>
       <span className="dot" />
       {label}
+    </span>
+  );
+}
+
+/** Paketin platformu: iOS (.ipa) ya da Android (.apk). Renkler styles.css `.badge.platform`. */
+export function PlatformBadge({ platform }: { platform: Platform }) {
+  return (
+    <span className={`badge platform ${platform}`}>
+      {platform === 'ios' ? <IconApple size={12} /> : <IconAndroid size={12} />}
+      {platform === 'ios' ? 'iOS' : 'Android'}
     </span>
   );
 }

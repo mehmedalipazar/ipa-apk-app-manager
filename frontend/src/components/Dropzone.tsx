@@ -9,13 +9,21 @@ import { IconUpload } from './icons.tsx';
 
 export interface DropzoneProps {
   onFile: (file: File) => void;
-  /** Kabul edilen uzanti — dogrulama burada yapilir, sunucu ayrica kontrol eder. */
+  /**
+   * Kabul edilen uzantilar (virgulle ayrilmis, orn. ".ipa,.apk") — dogrulama
+   * burada yapilir, sunucu ayrica kontrol eder.
+   */
   accept?: string;
   disabled?: boolean;
   hata?: string | null;
 }
 
-export function Dropzone({ onFile, accept = '.ipa', disabled = false, hata = null }: DropzoneProps) {
+export function Dropzone({
+  onFile,
+  accept = '.ipa,.apk',
+  disabled = false,
+  hata = null,
+}: DropzoneProps) {
   const [uzerinde, setUzerinde] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +65,7 @@ export function Dropzone({ onFile, accept = '.ipa', disabled = false, hata = nul
       <div className="dz-icon">
         <IconUpload size={34} />
       </div>
-      <div className="dz-title">IPA dosyasini buraya birakin</div>
+      <div className="dz-title">IPA ya da APK dosyasini buraya birakin</div>
       <div className="dz-sub">ya da tiklayarak bilgisayarinizdan secin</div>
 
       <input

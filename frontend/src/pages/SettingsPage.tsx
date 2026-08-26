@@ -235,7 +235,8 @@ function BaseUrlField({ baseUrl }: { baseUrl: string }) {
         <div className="help">
           Kurulum linklerinin ve manifest.plist icindeki adreslerin koku. Panelden
           degistirilemez; kaynagi sunucudaki PUBLIC_BASE_URL ortam degiskenidir. iOS
-          yalnizca gecerli sertifikali https adreslerinden kurulum yapar.
+          yalnizca gecerli sertifikali https adreslerinden kurulum yapar. Android APK
+          indirmeleri de ayni adres uzerinden sunulur.
         </div>
         <div className="readonly-value">{baseUrl || 'ayarlanmamis'}</div>
       </div>
@@ -386,7 +387,7 @@ function BakimKarti() {
       </div>
       <div className="card-body">
         <p style={{ color: 'var(--fg-muted)', fontSize: 14, marginBottom: 13 }}>
-          Suresi dolmus ya da iptal edilmis surumlerin IPA dosyalari, ayarlardaki
+          Suresi dolmus ya da iptal edilmis surumlerin paket dosyalari (.ipa/.apk), ayarlardaki
           "Silme gecikmesi" kadar sonra arka planda silinir. Diski hemen bosaltmak
           icin temizligi elle calistirabilirsiniz. Kayitlar silinmez, yalnizca
           dosyalar kaldirilir; link 410 doner ve surum bir daha yeniden

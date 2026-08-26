@@ -1,12 +1,12 @@
 /**
- * IPA yukleme ucu — POST /api/uploads
+ * Paket (IPA / APK) yukleme ucu — POST /api/uploads
  *
  * ROL KURALI: yukleme YALNIZCA yonetici oturumuyla yapilir. Bu kural
  * ayarlarla gevsetilemez — son kullanicinin servisle tek temasi kendisine
  * verilen kurulum linkidir.
  *
  * multipart/form-data bekler:
- *   file      — .ipa dosyasi (zorunlu)
+ *   file      — .ipa ya da .apk dosyasi (zorunlu; platform uzantidan anlasilir)
  *   ttlHours  — link omru, saat (opsiyonel)
  *   note      — serbest not (opsiyonel)
  *   password  — link sifresi (opsiyonel)
@@ -54,7 +54,7 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
     }
 
     if (!ingested) {
-      return reply.code(400).send({ error: 'Dosya bulunamadi. "file" alaniyla bir .ipa gonderin.' });
+      return reply.code(400).send({ error: 'Dosya bulunamadi. "file" alaniyla bir .ipa ya da .apk gonderin.' });
     }
 
     try {
@@ -69,7 +69,7 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       });
 
       request.log.info(
-        { buildId: build.id, bundleId: build.bundleId, size: build.sizeBytes },
+        { buildId: build.id, platform: build.platform, bundleId: build.bundleId, size: build.sizeBytes },
         'Yeni surum yuklendi',
       );
 
@@ -102,6 +102,6 @@ function hataYanitla(reply: FastifyReply, e: unknown, log: FastifyBaseLogger) {
 
 export const uploadsModule: AppModule = {
   name: 'uploads',
-  description: 'IPA yukleme (/api/uploads)',
+  description: 'Paket yukleme — .ipa/.apk (/api/uploads)',
   register,
 };

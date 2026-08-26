@@ -1,19 +1,25 @@
 /**
  * Yukleme akisinin butunu.
  *
- * Sira onemli: once dosyayi diske al, sonra cozumle. Boylece 1 GB'lik bir IPA
+ * Sira onemli: once dosyayi diske al, sonra cozumle. Boylece 1 GB'lik bir paket
  * bellege alinmaz ve bozuk dosya erken yakalanir.
  *
- * IPA cozumleme, simge cikarma ve manifest icin gereken her sey bu servisin
- * arkasinda, backend icinde kalir; arayuz yalnizca sonucu gorur.
+ * IPA/APK cozumleme, simge cikarma ve manifest icin gereken her sey bu servisin
+ * arkasinda, backend icinde kalir; arayuz yalnizca sonucu gorur. Servis platformu
+ * yalnizca domain/package sozlesmesi uzerinden tanir.
  */
 import { randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import type { BuildRecord, BuildsRepository } from '../../db/repositories/builds.repository.ts';
 import type { Storage } from '../../domain/storage/types.ts';
 import type { ConfigService } from '../../config/settings.service.ts';
-import { parseIpa } from '../../domain/ipa/parser.ts';
-import { IpaParseError } from '../../domain/ipa/types.ts';
+import { parsePackage, platformFromFilename } from '../../domain/package/index.ts';
+import {
+  PackageParseError,
+  type IconFormat,
+  type PackageMetadata,
+  type Platform,
+} from '../../domain/package/types.ts';
 import { generateToken } from '../../domain/links/token.ts';
 import { getStatus } from '../../domain/links/service.ts';
 import { UploadError } from '../../shared/errors.ts';
@@ -41,12 +47,14 @@ export interface FinalizeOptions {
  */
 export interface IngestedUpload {
   readonly id: string;
-  readonly ipaKey: string;
+  readonly platform: Platform;
+  /** Paket dosyasinin depolama anahtari (app.ipa / app.apk). */
+  readonly packageKey: string;
   readonly iconKey: string | null;
   readonly sizeBytes: number;
   readonly sha256: string;
   readonly filename: string;
-  readonly meta: Awaited<ReturnType<typeof parseIpa>>;
+  readonly meta: PackageMetadata;
 }
 
 /** Sure degistirilirken hangi anin uzerine eklenecegi. */
@@ -69,34 +77,39 @@ export class BuildService {
     this.config = config;
   }
 
-  static ipaKey(id: string): string {
-    return `${id}/app.ipa`;
+  /** Paket dosyasinin depolama anahtari — uzanti platformdan gelir. */
+  static packageKey(id: string, platform: Platform): string {
+    return `${id}/app.${platform === 'ios' ? 'ipa' : 'apk'}`;
   }
 
-  static iconKey(id: string): string {
-    return `${id}/icon.png`;
+  /** Simge anahtari — uzanti cozumleyicinin buldugu bicimden gelir (png / webp). */
+  static iconKey(id: string, format: IconFormat): string {
+    return `${id}/icon.${format}`;
   }
 
   /**
-   * 1. asama: akisi diske yaz, IPA'yi cozumle, simgeyi cikar.
+   * 1. asama: akisi diske yaz, paketi (IPA/APK) cozumle, simgeyi cikar.
    * Basarisiz olursa yarim dosyalari kendisi temizler.
    */
   async ingest(stream: Readable, filename: string): Promise<IngestedUpload> {
     const ayarlar = this.config.get();
 
-    if (!/\.ipa$/i.test(filename)) {
-      throw new UploadError('Yalnizca .ipa uzantili dosyalar yuklenebilir.');
+    // Uzanti yalnizca hangi cozumleyicinin denenecegini secer; asil format kapisi
+    // cozumleyicinin yapisal kontrolleridir (Payload/*.app ya da AndroidManifest.xml).
+    const platform = platformFromFilename(filename);
+    if (!platform) {
+      throw new UploadError('Yalnizca .ipa veya .apk uzantili dosyalar yuklenebilir.');
     }
 
     const id = randomUUID();
-    const ipaKey = BuildService.ipaKey(id);
+    const packageKey = BuildService.packageKey(id, platform);
     const maxBytes = ayarlar.maxUploadMb * 1024 * 1024;
 
     let sizeBytes: number;
     let sha256: string;
 
     try {
-      const sonuc = await this.storage.saveStream(ipaKey, stream, maxBytes);
+      const sonuc = await this.storage.saveStream(packageKey, stream, maxBytes);
       sizeBytes = sonuc.bytes;
       sha256 = sonuc.sha256;
     } catch (e) {
@@ -115,22 +128,22 @@ export class BuildService {
       throw new UploadError('Bos dosya yuklendi.');
     }
 
-    let meta: Awaited<ReturnType<typeof parseIpa>>;
+    let meta: PackageMetadata;
     try {
-      meta = await this.storage.withLocalFile(ipaKey, (path) => parseIpa(path));
+      meta = await this.storage.withLocalFile(packageKey, (path) => parsePackage(path, platform));
     } catch (e) {
       await this.storage.removePrefix(id); // Cozumlenemeyen dosyayi diskte tutma.
-      if (e instanceof IpaParseError) throw new UploadError(e.message, 422);
+      if (e instanceof PackageParseError) throw new UploadError(e.message, 422);
       throw e;
     }
 
     let iconKey: string | null = null;
     if (meta.icon) {
-      iconKey = BuildService.iconKey(id);
-      await this.storage.saveBuffer(iconKey, meta.icon);
+      iconKey = BuildService.iconKey(id, meta.icon.format);
+      await this.storage.saveBuffer(iconKey, meta.icon.data);
     }
 
-    return { id, ipaKey, iconKey, sizeBytes, sha256, filename, meta };
+    return { id, platform, packageKey, iconKey, sizeBytes, sha256, filename, meta };
   }
 
   /** 2. asama: link ayarlariyla birlikte kaydi olustur. */
@@ -146,8 +159,9 @@ export class BuildService {
     const build = this.builds.create({
       id: ingested.id,
       token: generateToken(),
+      platform: ingested.platform,
       originalFilename: ingested.filename,
-      ipaPath: ingested.ipaKey,
+      packagePath: ingested.packageKey,
       iconPath: ingested.iconKey,
       sizeBytes: ingested.sizeBytes,
       sha256: ingested.sha256,
@@ -169,6 +183,7 @@ export class BuildService {
     if (ayarlar.revokePreviousOnUpload) {
       revokedPrevious = this.builds.revokeOthersByBundleId(
         ingested.meta.bundleId,
+        ingested.platform,
         ingested.id,
         simdi,
       );

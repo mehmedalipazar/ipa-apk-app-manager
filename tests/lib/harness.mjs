@@ -143,7 +143,7 @@ export class Istemci {
   patch = (yol, json, s) => this.istek(yol, { ...s, method: 'PATCH', json });
   del = (yol, s) => this.istek(yol, { ...s, method: 'DELETE' });
 
-  /** multipart/form-data ile IPA yukler. */
+  /** multipart/form-data ile paket (IPA / APK) yukler; dosya adi yolun son parcasidir. */
   async yukle(dosyaYolu, alanlar = {}) {
     const { readFile } = await import('node:fs/promises');
     const { basename } = await import('node:path');
@@ -171,6 +171,22 @@ export function manifestAdresiCikar(html) {
   const m = /href="itms-services:\/\/\?action=download-manifest&amp;url=([^"]+)"/.exec(html);
   if (!m) throw new Error('Kurulum sayfasinda itms-services linki bulunamadi');
   return decodeURIComponent(m[1].replace(/&amp;/g, '&'));
+}
+
+/**
+ * Android goruntusu: APK kayitlarinda manifest/itms zinciri yoktur; sayfadaki
+ * buton dogrudan imzali app.apk adresine gider. Android UA sart degil (buton
+ * her goruntude var) ama adimlar/uyari UA'ya gore degisir.
+ */
+export const ANDROID_UA =
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
+export const ANDROID = { headers: { 'user-agent': ANDROID_UA } };
+
+/** Kurulum sayfasindan imzali app.apk adresini (tam URL) cikarir. */
+export function apkAdresiCikar(html) {
+  const m = /href="([^"]*\/app\.apk\?k=[^"]+)"/.exec(html);
+  if (!m) throw new Error('Kurulum sayfasinda app.apk linki bulunamadi');
+  return m[1].replace(/&amp;/g, '&');
 }
 
 /* --- Izole sunucu ornegi -------------------------------------------------- */

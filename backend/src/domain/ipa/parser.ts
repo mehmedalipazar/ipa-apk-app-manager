@@ -5,7 +5,7 @@
  *   1. Arsivin icindekiler listelenir (yalnizca meta veri, acma yok).
  *   2. Sadece gereken 2 dosya (Info.plist + en buyuk simge) bellege okunur.
  */
-import { listZipEntries, readZipEntries } from './zip.ts';
+import { listZipEntries, readZipEntries } from '../package/zip.ts';
 import { parsePlist, readString, readStringArray } from './plist.ts';
 import { normalizePng } from './cgbi.ts';
 import { IpaParseError, type IpaMetadata } from './types.ts';
@@ -82,5 +82,15 @@ export async function parseIpa(filePath: string): Promise<IpaMetadata> {
     if (ham) icon = normalizePng(ham);
   }
 
-  return { bundleId, appName, version, buildNumber, minOsVersion, platforms, appPath, icon };
+  return {
+    platform: 'ios',
+    bundleId,
+    appName,
+    version,
+    buildNumber,
+    minOsVersion,
+    platforms,
+    appPath,
+    icon: icon ? { data: icon, format: 'png' } : null,
+  };
 }

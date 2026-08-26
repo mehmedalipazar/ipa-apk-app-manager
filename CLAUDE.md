@@ -4,9 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Self-hosted iOS OTA (over-the-air) IPA distribution service. Admin uploads an `.ipa`, gets a
-time-limited shareable link; the recipient opens it in a mobile browser (Safari or Chrome) on an
-iPhone and installs in one tap.
+Self-hosted OTA (over-the-air) app distribution service for iOS **and Android**. Admin uploads an
+`.ipa` or an `.apk`, gets a time-limited shareable link; the recipient opens it in a mobile browser
+(Safari or Chrome) on the device and installs in one tap (iOS: `itms-services://` + manifest;
+Android: direct signed `.apk` download → package installer). **Each package is its own build with
+its own link/QR** — there is no iOS+Android pairing under one link (decision 2026-08-26); the only
+data-model discriminator is `builds.platform` (`'ios' | 'android'`).
 
 **Two fully independent services in one repo** (restructured 2026-08-13): `backend` (Fastify API)
 and `frontend` (React SPA). There is **no root-level build structure** — no root `package.json`, no
@@ -63,7 +66,7 @@ SQLite directly — they resolve `better-sqlite3` out of `backend/node_modules` 
 the server under test). C14 additionally needs `frontend/node_modules/.bin/vitest` (skips
 otherwise).
 
-- Group A (env-var reading) and the D/F/G/H blocks of group C spawn **isolated backend instances on
+- Group A (env-var reading) and the D/F/G/H/I blocks of group C spawn **isolated backend instances on
   free ports with temp data dirs** (`tests/lib/harness.mjs` spawns `backend/src/index.ts` with
   `cwd: backend/`, passes env explicitly and reads **no** `.env` files). Two things are *not*
   isolated: group C's opening block (C1/C2/C3/C5/C16, plus C3b which reads `WEB_PORT` from
@@ -89,6 +92,20 @@ otherwise).
   "Hata hangi katmanda dogdu?" table says which suite covers which of the three error layers
   (boot / API / transport).
 - Test IPAs: `tests/fixtures/*.ipa`, regenerate with `node tests/fixtures/make-ipa.mjs <out.ipa> …`.
+  Test APKs: `tests/fixtures/*.apk`, regenerate with `node tests/fixtures/make-apk.mjs <out.apk> …`
+  — that generator shells out to the Android SDK (`aapt2`/`zipalign`/`apksigner` from
+  `$ANDROID_HOME` or `~/Library/Android/sdk`, plus Java `keytool`), so it only runs on a machine
+  with the SDK; the **binaries are committed** and the suite itself needs no SDK. `demo-a.apk`
+  deliberately carries the same package id as `demo-a.ipa` (I12 pins platform-scoped revocation);
+  `demo-android.apk` has a `values-tr` label, an adaptive-icon XML and two PNG densities so the
+  parser's default-config / highest-density / skip-XML rules are exercised. (If you ever add a
+  fixture for the newer `resources.arsc` entry layouts: aapt2 2.20 emits SPARSE only with
+  `--enable-sparse-encoding` + `minSdk >= 32`, and COMPACT/OFFSET16 only with
+  `--enable-compact-entries` + `minSdk >= 34` — with lower minSdk the flags are silent no-ops. The
+  parser handles all three layouts; this was verified with throwaway APKs, not committed fixtures.)
+  Group **I** (I1–I19) in
+  suite C is the APK contract; it forges purpose-specific signatures from the harness's fixed
+  `SESSION_SECRET` to prove signature-purpose isolation directly.
 
 > **Post-split breakage was repaired 2026-08-20.** After the 2026-08-13 split, B and D read the
 > deleted root `.env`/`docker-compose.yml`, and — contrary to what this file used to claim
@@ -99,6 +116,24 @@ otherwise).
 > come from running them.** All suites now use `backend/.env`, `backend/docker-compose.yml`
 > (project `ipa-ota-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
 > service.
+
+**Latest full green run: 193/193** (2026-08-26, APK support, all four suites against the freshly
+rebuilt live stack): A 30/30 + C 100/100 (`tests/reports/rapor-2026-08-26T08-28-38-829Z.json`, C's
+live block against the production api on :3000, C3b probing the web container), B 14/14
+(`…T08-27-51-364Z`), D 49/49 (`…T08-26-47-543Z` — that report also shows B12 red, only because B
+ran seconds after the api container was recreated and its healthcheck still said `starting`; the B
+rerun is the 14/14 above). The 20 new group-I cases (I1–I19 incl. I4b/I15b) are green. Earlier
+reports from the same day: `…T08-14-09-613Z` (A+C before deploy, run against a dev backend via
+`--taban http://localhost:3010`; I8 red because the test-side signature forge joined
+`token/purpose/exp` with spaces where `token.ts` uses **NUL bytes** — that is also why git shows
+`token.ts` as binary; fixed in the test, the server was right) and `…T08-16-15-350Z` (C rerun,
+green, C3b skipped while the web container was down). Both images were rebuilt and deployed on
+2026-08-26 (~11:25 +03) **without a data backup at the user's explicit choice**; migration
+`003_builds_platform` ran on the live DB (3 existing rows → `ios`). Real-world check on production:
+`gtbys-21-08-1.2.5.apk` (37 MB, `com.kgm.gtbys`) uploaded through the domain, parsed to
+GTBYS / 1.2.5 / minSdk 26 with the xxxhdpi icon, and downloaded back through the proxy
+byte-identical (`application/vnd.android.package-archive`, Range 206). That build was left in place
+for a real-device test.
 
 Last full green run: **172/172** (2026-08-25, one A–D run right before the commit; A+C = 109 incl.
 C10b, B = 14, D = 49; report `tests/reports/rapor-2026-08-25T14-41-58-503Z.json`; the identical
@@ -318,9 +353,13 @@ and passed to modules as `ctx`. No globals, no Fastify decorators.
 ```
 config/     env.ts (infrastructure) + settings.schema.ts / settings.service.ts (runtime)
 db/         client.ts, forward-only migrations, repositories
-domain/     ipa/    zip listing → Info.plist → icon extraction (CgBI→PNG)
+domain/     package/ platform-neutral contract: Platform, PackageMetadata, PackageParseError,
+                     the yauzl zip reader (shared), platformFromFilename() + parsePackage() dispatcher
+            ipa/    Info.plist (bplist/XML) → metadata, icon extraction (CgBI→PNG)
+            apk/    binary AndroidManifest.xml (axml.ts) + resources.arsc (arsc.ts) → package,
+                    versionName/Code, minSdk, label + icon (highest-density PNG/WebP, XML skipped)
             links/  token generation, HMAC-signed URLs, link status
-            ota/    manifest.plist generation + server-rendered install page
+            ota/    manifest.plist generation + server-rendered install page (iOS + Android branches)
             storage/ Storage interface + local-disk driver
 modules/    auth, settings, builds, uploads, install, system  — each exports an AppModule
 jobs/       expiry cleanup
@@ -339,9 +378,17 @@ All typed errors extend `AppError` (which carries `statusCode`); the Fastify err
 When iOS follows `itms-services://`, the OS process `installd` — not Safari — fetches
 `manifest.plist` and the `.ipa`. It does not share Safari's cookies. Cookie-based protection would
 break OTA install entirely. Authorization therefore lives **in the URL** as a short-lived HMAC
-(`domain/links/token.ts`), bound to `token + purpose` (`manifest` | `ipa` | `icon`), so holding
-build A's link grants nothing for build B — and an `icon` signature is rejected on the `manifest`
-route. Never "fix" an install-path route by adding a session check.
+(`domain/links/token.ts`), bound to `token + purpose` (`manifest` | `ipa` | `apk` | `icon`), so
+holding build A's link grants nothing for build B — and an `icon` signature is rejected on the
+`manifest` route, an `ipa` signature on `app.apk`. Never "fix" an install-path route by adding a
+session check.
+
+Android has no manifest step: the install page's button *is* the signed `app.apk` URL
+(`LinkService.apkUrl`), served with `application/vnd.android.package-archive` by the same
+Range/416/download-counter handler as `app.ipa` (`paketiGonder` in `install.module.ts`). Platform
+mismatch is a **404 before status and signature checks**: `manifest.plist`/`app.ipa` on an Android
+build and `app.apk` on an iOS build do not exist. The icon route is `icon.png` *or* `icon.webp` —
+whichever basename the stored `iconPath` carries (Android launcher icons are often WebP).
 
 `qr.svg` is deliberately **unsigned and status-unchecked**: it only encodes the install page's own
 address, which the token holder already knows.
@@ -391,8 +438,18 @@ client gets 401 before sending a gigabyte of body.
 - **CgBI icons** (`domain/ipa/cgbi.ts`): Xcode rewrites app icons into Apple's CgBI variant — `.png`
   extension, not actually PNG. The module undoes three transforms (raw deflate, BGRA→RGBA,
   un-premultiply alpha). Unconvertible variants are skipped; the icon is optional, install is not.
+- **APK parsing is in-house** (`domain/apk/`, no npm dependency, same posture as `cgbi.ts`):
+  `AndroidManifest.xml` inside an APK is Android's binary XML, and `android:label` / `android:icon`
+  are usually resource references resolved through `resources.arsc`. Attributes are matched by
+  resource id first (R8 may strip names); a missing/oversized/corrupt `resources.arsc` degrades
+  (label falls back to the package's last segment, icon null) but never fails the upload — only
+  `package` is mandatory. `minOsVersion` stores the raw API level (`'24'`); the install page turns
+  it into "Android 7.0 (API 24)" via `sdk-levels.ts`.
 - **Migrations** (`db/migrations.ts`) are forward-only. Append to the array; never edit an existing
-  entry.
+  entry. `003_builds_platform` added `platform` (default `'ios'`); the `ipa_path` column kept its
+  historical name and is read/written as `BuildRecord.packagePath`.
+- **`revokePreviousOnUpload` is platform-scoped** (`revokeOthersByBundleId(bundleId, platform, …)`):
+  `com.example.app` is routinely the same id on both platforms and one must never revoke the other.
 - **Cleanup** (`jobs/cleanup.job.ts`, at boot + every 15 min) purges builds that have been
   **expired OR revoked** for longer than `purgeAfterExpiryHours` (`findPurgeable`): deletes files
   but keeps the row, marking `files_deleted_at` — the build shows as "purged", the link returns

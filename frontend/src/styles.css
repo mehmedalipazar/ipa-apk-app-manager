@@ -235,6 +235,10 @@ a { color: var(--accent); }
 .badge.expired { background: var(--warn-soft); color: var(--warn); }
 .badge.revoked { background: var(--err-soft);  color: var(--err); }
 .badge.purged  { background: var(--surface-2); color: var(--fg-muted); }
+/* Platform rozeti (PlatformBadge): iOS notr, Android yesil. */
+.badge.platform.ios     { background: var(--surface-2); color: var(--fg); }
+.badge.platform.android { background: var(--ok-soft);   color: var(--ok); }
+.badge.platform svg     { display: block; }
 .badge .dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
 
 /* --- Sonuc ekrani --------------------------------------------------------- */

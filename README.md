@@ -1,12 +1,16 @@
 # ipa-ota-download
 
-Kendi sunucunuzda çalışan iOS **OTA (over-the-air)** dağıtım servisi. IPA'yı panelden
-yükleyin, süreli bir kurulum linki alın; alıcı linki iPhone'da mobil tarayıcısıyla
-açıp tek dokunuşla kurar. Diawi / InstallOnAir muadili — dosyalarınız üçüncü taraf sunucuya çıkmaz.
+Kendi sunucunuzda çalışan iOS **ve Android** **OTA (over-the-air)** dağıtım servisi. IPA ya da
+APK'yı panelden yükleyin, süreli bir kurulum linki alın; alıcı linki telefonunda mobil
+tarayıcısıyla açıp tek dokunuşla kurar (iOS: `itms-services` kurulumu, Android: imzalı `.apk`
+indirmesi → paket yükleyici). Diawi / InstallOnAir muadili — dosyalarınız üçüncü taraf sunucuya
+çıkmaz. Her paket kendi başına bir sürümdür (ayrı link, ayrı QR); iOS ve Android sürümleri tek link
+altında eşleştirilmez.
 
-Öne çıkanlar: sürükle-bırak yükleme, otomatik IPA çözümleme (paket adı, sürüm, simge),
-süreli + şifreli + QR kodlu linkler, admin panel (sürümler, sayaçlar, tüm ayarlar),
-otomatik disk temizliği, uçtan uca TypeScript, Docker ile tek komut kurulum.
+Öne çıkanlar: sürükle-bırak yükleme, otomatik IPA/APK çözümleme (paket adı, sürüm, simge —
+APK için `AndroidManifest.xml` + `resources.arsc` bağımlılıksız okunur), süreli + şifreli + QR
+kodlu linkler, admin panel (sürümler, platform filtresi, sayaçlar, tüm ayarlar), otomatik disk
+temizliği, uçtan uca TypeScript, Docker ile tek komut kurulum.
 
 ---
 
@@ -20,6 +24,10 @@ ve yükleme akışını test etmek içindir — cihaza kurulum yapamaz.
 
 **Enterprise (In-House)** imzalı IPA her cihaza kurulur; **Ad-Hoc** imzalı IPA yalnızca
 UDID'si provisioning profile'a eklenmiş cihazlara. Servis imzaya karışmaz.
+
+Android tarafında HTTPS teknik bir şart değildir (APK düz dosya olarak indirilir) ama tarayıcılar
+düz `http://` üzerinden APK indirmesini "güvensiz" diye işaretleyip engelleyebilir; aynı `https://`
+adres ikisine de hizmet eder. APK'nın da imzalı olması gerekir (`apksigner`), servis imzaya karışmaz.
 
 ---
 
@@ -213,9 +221,10 @@ düz `docker compose up -d` bu servisi de başlatır.
   yönetimi ve ayarlar dahil tüm `/api/*` uçları oturum ister; `POST /api/uploads` dosya
   gövdesi okunmadan 401 döner ve bunu kapatan bir ayar **yoktur**.
 - **Link sahibi** — hesabı yoktur; elindeki kurulum linki yalnızca o sürümü kurdurur.
-  Token 22 karakter rastgeledir; `manifest.plist` ve `app.ipa` adresleri `token + amaç`
+  Token 22 karakter rastgeledir; `manifest.plist`, `app.ipa` ve `app.apk` adresleri `token + amaç`
   ikilisine bağlı kısa ömürlü **HMAC imzası** taşır: A linki B'nin dosyasına erişemez,
-  imzasız erişim 403 alır.
+  imzasız erişim 403 alır, `app.ipa` için üretilen imza `app.apk`'yı açmaz. Android kaydında
+  `manifest.plist`/`app.ipa`, iOS kaydında `app.apk` yoktur (404).
 - İsteğe bağlı **link şifresi** ikinci katmandır; doğrulanmadan imzalı adresler sayfaya
   hiç yazılmaz. Linki elde eden herkes kurabilir — kişi bazlı kimlik gerekiyorsa şifre
   kullanın ya da servisi VPN/SSO arkasına alın.
@@ -228,10 +237,17 @@ OTA kurulumunu bozar. Kurulum yollarına oturum kontrolü eklemeyin.
 
 ## Kullanım
 
-Panele girin → IPA'yı sürükleyin → süre / not / şifre seçin → çıkan linki paylaşın.
-Alıcı linki iPhone'da **mobil tarayıcısıyla** (Safari ya da Chrome) açar; Enterprise imzalı uygulamada ilk açılışta
-*Ayarlar › Genel › VPN ve Aygıt Yönetimi*'nden **Güven** demesi gerekir (kurulum sayfası
-bunu anlatır).
+Panele girin → IPA ya da APK'yı sürükleyin → süre / not / şifre seçin → çıkan linki paylaşın.
+Platform dosya uzantısından anlaşılır; sürüm kartlarında iOS/Android rozeti ve platform filtresi vardır.
+
+- **iOS:** Alıcı linki iPhone'da **mobil tarayıcısıyla** (Safari ya da Chrome) açar; Enterprise
+  imzalı uygulamada ilk açılışta *Ayarlar › Genel › VPN ve Aygıt Yönetimi*'nden **Güven** demesi
+  gerekir (kurulum sayfası bunu anlatır).
+- **Android:** Alıcı linki Android cihazında açar, **Uygulamayı İndir**'e dokunur; tarayıcı `.apk`'yı
+  indirir. İndirilen dosyaya dokununca paket yükleyici açılır; ilk seferde tarayıcı için
+  *Bilinmeyen uygulamaları yükle* izni istenir, ardından **Yükle**. Sayfa masaüstünde ya da
+  iPhone'da açılırsa uyarı + QR + indirme butonu gösterilir (APK düz dosyadır, `adb install` ile
+  de kurulabilir).
 
 Süre / not / şifre `Sürümler › Düzenle`den sonradan değiştirilir; panel yalnızca
 dokunduğunuz alanı gönderir. Süre düzenlerken taban seçilir:
@@ -257,10 +273,10 @@ yanlış host'lu manifest cihazda sessizce başarısız olduğu için panelden d
 |---|---|---|
 | Varsayılan link süresi | 24 saat | Yeni linklerin ömrü |
 | En uzun link süresi | 720 saat | Panel tavanı; en fazla 8760 (1 yıl) |
-| Silme gecikmesi | 24 saat | Süresi dolan **veya iptal edilen** IPA'nın diskten silinme gecikmesi; silindikten sonra link yeniden açılamaz |
-| İmzalı link ömrü | 120 dk | manifest/ipa imza geçerliliği (linkin ömründen bağımsız) |
-| En büyük dosya boyutu | 1024 MB | Kabul edilen en büyük IPA |
-| Önceki sürümü otomatik iptal | kapalı | Aynı bundle-id yüklenince eskisini kapatır |
+| Silme gecikmesi | 24 saat | Süresi dolan **veya iptal edilen** paketin (IPA/APK) diskten silinme gecikmesi; silindikten sonra link yeniden açılamaz |
+| İmzalı link ömrü | 120 dk | manifest / ipa / apk imza geçerliliği (linkin ömründen bağımsız) |
+| En büyük dosya boyutu | 1024 MB | Kabul edilen en büyük paket (IPA/APK) |
+| Önceki sürümü otomatik iptal | kapalı | Aynı paket kimliği **ve aynı platformda** yeni paket yüklenince eskisini kapatır; iOS ile Android sürümleri birbirini kapatmaz |
 | Site adı / Kurulum notu / QR | — | Kurulum sayfasının görünümü |
 
 Link süresi üç kademedir: kod tavanı `MAX_TTL_HOURS = 8760`
@@ -376,6 +392,11 @@ oradan başlatılır), C14 ise `frontend/node_modules/.bin/vitest`'i çocuk sür
 göremediği taşıma katmanı hatalarının arayüzde doğru mesaja dönüştüğünü sınar;
 `src/env-order.test.ts` Vite'ın `.env` dosya sırasını gerçek `loadEnv` ile ölçer.
 
+Test paketleri `tests/fixtures/` altındadır ve depoya girer: `.ipa`'lar `make-ipa.mjs` ile,
+`.apk`'lar `make-apk.mjs` ile üretilir. APK üreticisi Android SDK build-tools (`aapt2`, `zipalign`,
+`apksigner`) ve Java (`keytool`) ister — yalnızca yeniden üretmek için; koşum SDK istemez.
+`demo-a.apk` bilerek `demo-a.ipa` ile aynı paket kimliğini taşır (platforma özel iptal testi).
+
 ```bash
 node tests/run-suite.mjs            # tüm gruplar (A, B, C, D)
 node tests/run-suite.mjs A C        # yalnızca seçilen gruplar
@@ -389,7 +410,7 @@ Gruplar aynı ölçüde izole **değildir** — koşmadan önce bilin:
 |---|---|---|
 | A | Her senaryo için ayrı bir backend süreci (geçici `DATA_DIR`, boş port; hiçbir `.env` okunmaz) | Hiçbir şeye |
 | B | Sunucu başlatmaz: çalışan backend compose yığınına `docker compose config/exec` (`backend/` dizininden) + `ipa-ota-vartest` adlı geçici compose projesi (:38080) | Yığın kapalıysa ilgili adımlar atlanır; geçici proje sonda silinir |
-| C | C1/C2/C3/C5/C16 **canlı** `--taban` adresine gider (varsayılan `http://localhost:3000` — bu makinede üretim api container'ı; ayakta olmalı). C3b web container'ını (`frontend/.env` `WEB_PORT`) yoklar. D/F/G/H blokları izole sunucuda | Canlı bloğu yalnızca okur |
+| C | C1/C2/C3/C5/C16 **canlı** `--taban` adresine gider (varsayılan `http://localhost:3000` — bu makinede üretim api container'ı; ayakta olmalı). C3b web container'ını (`frontend/.env` `WEB_PORT`) yoklar. D/F/G/H/I blokları izole sunucuda | Canlı bloğu yalnızca okur |
 | D | `suite-d-https.mjs`: yayındaki HTTPS zincirini hedefler. `backend/.env`'den `PUBLIC_BASE_URL`, `INSTALL_PATH_PREFIX`, `ADMIN_PASSWORD` okur, **canlı panele gerçek şifreyle girer**, üç geçici sürüm yükler (D5.1, D9.2, D10.1), birini iptal eder (D9.4), sonunda hepsini siler (D12.1) | **Üretim verisi** — koşum yarıda kesilirse artık sürümleri panelden silin |
 
 > **Servis ayrımı (13 Ağustos 2026) tüm paketi kırmıştı; 20 Ağustos'ta onarıldı.** B ve D silinen
@@ -399,7 +420,13 @@ Gruplar aynı ölçüde izole **değildir** — koşmadan önce bilin:
 > hakkındaki iddialar koşumdan gelir.** Bugün tüm betikler `backend/.env`,
 > `backend/docker-compose.yml` (proje `ipa-ota-backend`) ve `frontend/.env` / `frontend/` kullanır.
 
-Son tam yeşil koşum: **172/172** (25 Ağustos 2026; A+C 109, B 14, D 49).
+Son tam yeşil koşum: **193/193** (26 Ağustos 2026, APK desteği; A 30 + C 100
+`tests/reports/rapor-2026-08-26T08-28-38-829Z.json`, B 14 `…T08-27-51-364Z`, D 49
+`…T08-26-47-543Z` — o raporda B12 kırmızıdır: B, api container'ı yenilendikten saniyeler sonra
+koşmuş, healthcheck henüz `starting` idi; B tekrarı 14/14). Yeni Android grubu I1–I19 dahil.
+İmajlar aynı gün yeniden kurulup dağıtıldı; gerçek bir APK (`com.kgm.gtbys` 1.2.5, 37 MB) alan adı
+üzerinden yüklenip proxy'den bayt bayt aynı indirildi. Bir önceki tam koşum: **172/172**
+(25 Ağustos 2026; A+C 109, B 14, D 49).
 Senaryo matrisi `tests/TEST-PLAN.md` (oradaki "D. Admin Ayarlar" bloğu suite C'nin içindedir;
 `run-suite.mjs D` ise HTTPS grubudur — harf çakışması tarihseldir), kanıt geçmişi
 `tests/BULGULAR-HTTPS.md` (10 Ağustos ve öncesi; oradaki CORS duruşu 20 Ağustos'ta tersine

@@ -7,6 +7,7 @@
  */
 import { escapeHtml, formatBytes, formatDateTime, formatRemaining } from '../../shared/format.ts';
 import type { BuildRecord } from '../../db/repositories/builds.repository.ts';
+import { androidVersionLabel } from '../apk/sdk-levels.ts';
 import { STATUS_LABELS, type BuildStatus } from '../links/service.ts';
 
 export interface InstallPageInput {
@@ -15,7 +16,9 @@ export interface InstallPageInput {
   readonly status: BuildStatus;
   /** iOS cihazdan mi geliniyor? Degilse QR kod gosterilir. */
   readonly isIos: boolean;
-  /** itms-services:// adresi. Sifre girilmemisse null. */
+  /** Android cihazdan mi geliniyor? (Android paketleri icin: degilse uyari + QR.) */
+  readonly isAndroid: boolean;
+  /** iOS: itms-services:// adresi — Android: imzali app.apk adresi. Sifre girilmemisse null. */
   readonly installUrl: string | null;
   /** Simge adresi (imzali). Simge yoksa null. */
   readonly iconUrl: string | null;
@@ -138,6 +141,17 @@ export function renderInstallPage(input: InstallPageInput): string {
   const baslik = `${build.appName} ${build.version}`;
 
   const kalan = formatRemaining(build.expiresAt);
+
+  // "En az" satiri: iOS'ta ham surum ("15.0"), Android'de API seviyesinden
+  // turetilen etiket ("7.0 (API 24)"). Bilinmiyorsa satir hic cizilmez.
+  let enAzSatiri = '';
+  if (build.platform === 'android') {
+    const etiket = androidVersionLabel(build.minOsVersion);
+    if (etiket) enAzSatiri = `<dt>En az Android</dt><dd>${escapeHtml(etiket)}</dd>`;
+  } else if (build.minOsVersion) {
+    enAzSatiri = `<dt>En az iOS</dt><dd>${escapeHtml(build.minOsVersion)}</dd>`;
+  }
+
   const detaylar = `
     <div class="card">
       <h2>Uygulama bilgileri</h2>
@@ -145,7 +159,7 @@ export function renderInstallPage(input: InstallPageInput): string {
         <dt>Surum</dt><dd>${escapeHtml(build.version)} (${escapeHtml(build.buildNumber)})</dd>
         <dt>Paket adi</dt><dd>${escapeHtml(build.bundleId)}</dd>
         <dt>Boyut</dt><dd>${formatBytes(build.sizeBytes)}</dd>
-        ${build.minOsVersion ? `<dt>En az iOS</dt><dd>${escapeHtml(build.minOsVersion)}</dd>` : ''}
+        ${enAzSatiri}
         <dt>Link gecerlilik</dt><dd>${kalan ? `${escapeHtml(kalan)} kaldi` : 'doldu'}</dd>
       </dl>
     </div>`;
@@ -179,6 +193,9 @@ export function renderInstallPage(input: InstallPageInput): string {
       siteName,
     );
   }
+
+  /* --- Android paketi: manifest/itms zinciri yok, dogrudan indirme --- */
+  if (build.platform === 'android') return renderAndroidPage(input, detaylar, not);
 
   /* --- iOS disi cihaz: QR goster --- */
   // DIKKAT: iPadOS 13+ varsayilan olarak masaustu Safari UA'si verir
@@ -279,6 +296,95 @@ export function renderInstallPage(input: InstallPageInput): string {
   );
 }
 
+/**
+ * Android (.apk) sayfasi.
+ *
+ * Android'de manifest/itms zinciri yoktur: buton imzali app.apk adresine gider,
+ * tarayici dosyayi indirir, kullanici indirilen dosyayi acip paket yukleyiciye
+ * verir. Buton HER goruntude vardir — APK duz bir dosyadir; masaustunden indirip
+ * `adb install` ile kurmak mesru, ayrica Chrome'un "masaustu sitesi" modu UA'dan
+ * "Android"i dusurur. Cihaz disi goruntude ek olarak uyari + QR gosterilir.
+ * Metinlere tarayici markasi YAZILMAZ (bkz. STYLES yorumu / H8).
+ */
+function renderAndroidPage(input: InstallPageInput, detaylar: string, not: string): string {
+  const { build, siteName } = input;
+  const baslik = `${build.appName} ${build.version}`;
+
+  const head = (buton: string) => `<div class="head">
+       ${iconBlock(input.iconUrl, build.appName)}
+       <h1>${escapeHtml(build.appName)}</h1>
+       <p class="sub">Surum ${escapeHtml(build.version)} (${escapeHtml(build.buildNumber)})</p>
+       ${buton}
+     </div>`;
+
+  /* --- Android cihazda: indir + adimlar --- */
+  if (input.isAndroid) {
+    const buton = input.installUrl
+      ? `<a class="btn" href="${escapeHtml(input.installUrl)}">Uygulamayi Indir</a>`
+      : `<span class="btn disabled">Indirme kullanilamiyor</span>`;
+
+    return shell(
+      baslik,
+      `${head(buton)}
+
+       <div class="card">
+         <h2>Kurulum adimlari</h2>
+         <ol>
+           <li><strong>Uygulamayi Indir</strong>'e dokunun; indirme bildirim cubugunda gorunur.</li>
+           <li>Indirme bitince bildirime dokunun (ya da <strong>Dosyalar &rsaquo; Indirilenler</strong>
+               icindeki .apk dosyasini acin).</li>
+           <li><em>"Bilinmeyen uygulamalari yukle"</em> izni istenirse acilan ayardan tarayiciniza
+               izin verin ve geri donun.</li>
+           <li><strong>Yukle</strong>'ye dokunun. Play Protect uyarisi cikarsa
+               <strong>Yine de yukle</strong>'yi secin.</li>
+         </ol>
+       </div>
+
+       ${detaylar}
+       ${not}
+
+       <div class="notice warn">
+         Kurulum sirasinda cihazin internete bagli kalmasi gerekir.
+         Sayfa mobil tarayiciniz disinda (orn. WhatsApp ya da Instagram icinde) acildiysa
+         indirme baslamayabilir; bu durumda linki mobil tarayicinizda acin.
+       </div>
+
+       <div class="foot">${escapeHtml(siteName)}</div>`,
+      siteName,
+    );
+  }
+
+  /* --- Android disi cihaz (masaustu, iPhone): uyari + indirme + QR --- */
+  const buton = input.installUrl
+    ? `<a class="btn" href="${escapeHtml(input.installUrl)}">Uygulamayi Indir (.apk)</a>`
+    : '';
+
+  const qr = input.showQrCode
+    ? `<div class="card qr">
+         <img src="${escapeHtml(input.pageUrl)}/qr.svg" alt="QR kod" width="210" height="210">
+         <div style="color:var(--muted);font-size:14px;text-align:center">
+           Android cihazin kamerasiyla okutun
+         </div>
+       </div>`
+    : '';
+
+  return shell(
+    baslik,
+    `${head('')}
+     <div class="notice warn" id="android-uyari">
+       Bu uygulama yalnizca <strong>Android</strong> cihazlara kurulabilir.
+       Kurulum icin bu sayfayi Android cihazinizin tarayicisinda acin ya da asagidaki QR kodu okutun.
+       Dosyayi buradan indirip cihaza aktarabilirsiniz de.
+     </div>
+     ${buton}
+     ${qr}
+     ${detaylar}
+     ${not}
+     <div class="foot">${escapeHtml(siteName)}</div>`,
+    siteName,
+  );
+}
+
 /** Suresi dolmus / iptal edilmis / bulunamayan linkler icin. */
 export function renderUnavailablePage(
   siteName: string,
@@ -346,4 +452,13 @@ export function isIosUserAgent(ua: string | undefined): boolean {
   if (!ua) return false;
   if (/iPhone|iPad|iPod/i.test(ua)) return true;
   return /Macintosh/i.test(ua) && /Mobile\//i.test(ua);
+}
+
+/**
+ * Android tespiti — yalnizca UA'dan. iOS UA'lari "Android" icermez. Chrome'un
+ * "masaustu sitesi" modu bu sozcugu dusurur; o durumda sayfa yine indirme
+ * butonunu tasir (renderAndroidPage), yalnizca uyari + QR eklenir.
+ */
+export function isAndroidUserAgent(ua: string | undefined): boolean {
+  return !!ua && /Android/i.test(ua);
 }

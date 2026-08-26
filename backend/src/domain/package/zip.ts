@@ -1,10 +1,10 @@
 /**
- * IPA = ZIP. Buradaki amac tum arsivi acmak degil, yalnizca ihtiyac duyulan
- * birkac kucuk dosyayi (Info.plist + simge) bellege okumak. 1 GB'lik bir IPA
+ * IPA ve APK = ZIP. Buradaki amac tum arsivi acmak degil, yalnizca ihtiyac duyulan
+ * birkac kucuk dosyayi (Info.plist, AndroidManifest.xml, simge) bellege okumak. 1 GB'lik bir paket
  * icin bile disk kullanimi sifir kalir.
  */
 import yauzl from 'yauzl';
-import { IpaParseError } from './types.ts';
+import { PackageParseError } from './types.ts';
 
 export interface ZipEntryInfo {
   readonly path: string;
@@ -28,7 +28,7 @@ export async function readZipEntries(
   return new Promise((resolve, reject) => {
     yauzl.open(filePath, { lazyEntries: true, autoClose: true }, (err, zipfile) => {
       if (err || !zipfile) {
-        reject(new IpaParseError('Dosya acilamadi — gecerli bir ZIP/IPA arsivi degil.', err));
+        reject(new PackageParseError('Dosya acilamadi — gecerli bir ZIP arsivi (IPA/APK) degil.', err));
         return;
       }
 
@@ -39,7 +39,7 @@ export async function readZipEntries(
         if (bitti) return;
         bitti = true;
         zipfile.close();
-        reject(e instanceof IpaParseError ? e : new IpaParseError(mesaj, e));
+        reject(e instanceof PackageParseError ? e : new PackageParseError(mesaj, e));
       };
 
       zipfile.on('error', (e) => basarisiz(e, 'Arsiv okunurken hata olustu.'));
@@ -76,7 +76,7 @@ export async function readZipEntries(
               // girdiye tasimadigi icin promise'i sonsuza dek asili birakirdi.
               stream.destroy();
               basarisiz(
-                new IpaParseError(`Arsiv girdisi ("${path}") beyan edilen boyutunu asiyor — dosya bozuk olabilir.`),
+                new PackageParseError(`Arsiv girdisi ("${path}") beyan edilen boyutunu asiyor — dosya bozuk olabilir.`),
                 'Arsiv okunurken hata olustu.',
               );
               return;
@@ -107,11 +107,11 @@ export async function listZipEntries(filePath: string): Promise<ZipEntryInfo[]> 
   return new Promise((resolve, reject) => {
     yauzl.open(filePath, { lazyEntries: true, autoClose: true }, (err, zipfile) => {
       if (err || !zipfile) {
-        reject(new IpaParseError('Dosya acilamadi — gecerli bir ZIP/IPA arsivi degil.', err));
+        reject(new PackageParseError('Dosya acilamadi — gecerli bir ZIP arsivi (IPA/APK) degil.', err));
         return;
       }
       const girdiler: ZipEntryInfo[] = [];
-      zipfile.on('error', (e) => reject(new IpaParseError('Arsiv okunamadi.', e)));
+      zipfile.on('error', (e) => reject(new PackageParseError('Arsiv okunamadi.', e)));
       zipfile.on('entry', (entry: yauzl.Entry) => {
         girdiler.push({ path: entry.fileName, size: entry.uncompressedSize });
         zipfile.readEntry();

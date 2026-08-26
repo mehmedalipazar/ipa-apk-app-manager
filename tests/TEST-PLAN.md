@@ -57,6 +57,7 @@ Kritik davranis kurallari (testler bunlari dogrular):
 | Vite dosya sirasi `.env` → `.env.local` → `.env.[mode]` → `.env.[mode].local`; `.env.local` mode dosyasini EZEMEZ, makineye ozel ezme `.env.development.local` | `frontend/src/env-order.test.ts` |
 | Kimlik: `credentials: 'include'` cerez (`SameSite=None; Secure` — CORS acik); OTA indirmeleri **imzali URL**, cerez degil | `frontend/src/api.ts` (`request()`), `backend/src/domain/links/token.ts` |
 | `CORS_ORIGINS` doluyken durum degistiren isteklerde yabanci `Origin` 403 (CSRF kapisi) | `backend/src/server.ts` |
+| Platform dosya uzantisindan belirlenir (`platformFromFilename`: .ipa → ios, .apk → android); `builds.platform` sutunu (migration 003, eski satirlar ios); `revokePreviousOnUpload` yalnizca **ayni platform + ayni bundle_id** icin; imza amaclari `manifest \| ipa \| apk \| icon` birbirinden izole; Android kaydinda `manifest.plist`/`app.ipa`, iOS kaydinda `app.apk` 404 | `backend/src/domain/package/index.ts`, `db/migrations.ts`, `db/repositories/builds.repository.ts`, `domain/links/token.ts`, `modules/install/install.module.ts` |
 
 ---
 
@@ -215,7 +216,7 @@ Her alan icin: **gecerli deger**, **sinir alti**, **sinir ustu**, **kalicilik (F
 | F17 | baseUrl bosken yukleme | 201 ama `installUrl: null` + uyari |
 | F18 | Bozuk IPA | 422 "Payload/<uygulama>.app klasoru bulunamadi" |
 | F19 | Bos dosya | 400 "Bos dosya yuklendi." |
-| F20 | Yanlis uzanti | 400 ".ipa uzantili dosyalar" |
+| F20 | Yanlis uzanti | 400 ".ipa veya .apk uzantili dosyalar" (I15b `.apk`'yi de pinler) |
 | F21 | Boyut siniri asimi | 413 |
 | F22 | Yetkisiz yukleme | 401, govde okunmadan |
 
@@ -233,6 +234,33 @@ Her alan icin: **gecerli deger**, **sinir alti**, **sinir ustu**, **kalicilik (F
 | G8 | Oturum TTL | 12 saat |
 
 ---
+
+## I. Android APK (suite C icinde, H8'den sonra)
+
+Fiksturler `tests/fixtures/*.apk` (`make-apk.mjs`, uretim icin Android SDK build-tools + Java gerekir;
+ikililer depoda). `demo-a.apk`, `demo-a.ipa` ile **ayni paket kimligini** tasir (I12). Imza anahtarlari
+harness'in sabit `SESSION_SECRET`i ile testte turetilir (I8/I9/I11).
+
+| # | Senaryo | Beklenen |
+|---|---|---|
+| I1 | `demo-android.apk` yukle | 201; `platform:'android'`, paket/etiket (arsc, varsayilan config)/versionName/versionCode/minSdk/`platforms:['Android']`, `iconUrl` `icon.png?k=` |
+| I2 | Simge secimi | 200 `image/png`, 144px (xxhdpi; mdpi ve adaptive XML elenir) |
+| I3 | Android UA sayfasi | `app.apk?k=` butonu, Android adimlari, `En az Android 7.0 (API 24)`; `itms-services`/`qr.svg`/`Safari`/`ipad-kurulum` YOK |
+| I4 / I4b | Masaustu ve iPhone UA | `id="android-uyari"` + QR + buton; itms yok |
+| I5 | iOS kaydi Android UA ile | Eski iOS-disi sayfa (`ipad-kurulum`, "iPhone ve iPad"); `app.apk` yok |
+| I6 | `app.apk` indirme | 200, `application/vnd.android.package-archive`, `attachment; filename="Demo_Android-1.2.0.apk"`, content-length, `PK` imzasi |
+| I7 | Range / HEAD / 416 + sayac | 206 / 206 / 416 `bytes */size` / HEAD 200; `downloadCount` = 2 |
+| I8 | Imza amaci izolasyonu | ipa/icon anahtari → 403, apk anahtari → 200, anahtarsiz/bozuk → 403 |
+| I9 | Capraz platform rotalari | Android kaydinda `manifest.plist`/`app.ipa`/`icon.webp` 404; iOS kaydinda `app.apk` 404 |
+| I10 | Iptal / yeniden ac | Sayfa 410 (linksiz), `app.apk` 410, `iconUrl:null`; unrevoke → 200 |
+| I11 | Temizlik (purged) | `purged`, sayfa 410, `app.apk` 410, `uploads/<id>` yok |
+| I12 | `revokePreviousOnUpload` platforma ozel | APK, IPA'yi iptal etmez (ve tersi); ayni platformda eskisi iptal |
+| I13 | Liste filtresi | `?platform=android|ios` saf; `?platform=windows` 400; `search` platformlar arasi |
+| I14 / I15 / I15b | Bozuk dosyalar | ZIP degil 422; AndroidManifest.xml yok 422; yanlis uzanti mesaji `.ipa` ve `.apk` |
+| I16 | `demo-a.apk` (literal etiket, simgesiz, arsc yok) | `appName` literal, `iconUrl:null`, `minOsVersion '21'`, sayfada yer tutucu + `5.0 (API 21)` |
+| I17 | `demo-webp.apk` | `iconUrl` `icon.webp?k=`, 200 `image/webp`; `icon.png` 404 (fikstur yoksa skip) |
+| I18 | Sifreli APK linki | Form; yanlis sifre "hatali"; dogru sifrede `app.apk?k=` |
+| I19 | Kalici silme | 404 + `uploads/<id>` yok |
 
 ## Calistirma
 

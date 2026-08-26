@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "iOS OTA IPA dagitim servisi - admin arayuzu (React SPA). Bagimsiz servis; backend ile tek baglantisi HTTP'dir.",
+  "description": "iOS/Android OTA paket (IPA/APK) dagitim servisi - admin arayuzu (React SPA). Bagimsiz servis; backend ile tek baglantisi HTTP'dir.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",

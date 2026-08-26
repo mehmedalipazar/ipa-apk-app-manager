@@ -37,7 +37,7 @@ export const AppConfigSchema = z.object({
   /** Bir linke verilebilecek en uzun sure (saat). Yuklemede asilamaz. */
   maxTtlHours: z.number().int().min(1).max(MAX_TTL_HOURS).default(720),
 
-  /** Kabul edilen en buyuk IPA boyutu (MB). */
+  /** Kabul edilen en buyuk paket (IPA/APK) boyutu (MB). */
   maxUploadMb: z.number().int().min(1).max(8192).default(1024),
 
   /** Suresi dolan YA DA iptal edilen linklerin dosyalari kac saat sonra diskten silinsin? Silindikten sonra link yeniden acilamaz / uzatilamaz (409). */
@@ -52,10 +52,10 @@ export const AppConfigSchema = z.object({
   /** Kurulum sayfasinda QR kod gosterilsin mi? */
   showQrCode: z.boolean().default(true),
 
-  /** Ayni bundle-id icin yeni yukleme yapilinca eskisi iptal edilsin mi? */
+  /** Ayni paket kimligi (bundle id / package) ve ayni platformda yeni yukleme yapilinca eskisi iptal edilsin mi? */
   revokePreviousOnUpload: z.boolean().default(false),
 
-  /** manifest.plist ve .ipa icin uretilen imzali linklerin omru (dakika). */
+  /** manifest.plist, .ipa ve .apk icin uretilen imzali linklerin omru (dakika). */
   signedUrlTtlMinutes: z.number().int().min(5).max(1440).default(120),
 });
 
@@ -140,7 +140,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'purgeAfterExpiryHours',
     label: 'Silme gecikmesi',
-    help: 'Suresi dolan ya da iptal edilen linklerin IPA dosyalari bu sure sonunda diskten silinir; sonrasinda link yeniden acilamaz. 0 = hemen sil.',
+    help: 'Suresi dolan ya da iptal edilen linklerin paket dosyalari (.ipa/.apk) bu sure sonunda diskten silinir; sonrasinda link yeniden acilamaz. 0 = hemen sil.',
     kind: 'number',
     unit: 'saat',
     min: 0,
@@ -150,7 +150,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'signedUrlTtlMinutes',
     label: 'Imzali link omru',
-    help: 'manifest.plist ve .ipa adresleri icin uretilen imzanin gecerlilik suresi. Linkin toplam omruyle ilgisi yoktur; yavas baglantilarda indirme yarida kesilmesin diye yeterince uzun olmali.',
+    help: 'manifest.plist, .ipa ve .apk adresleri icin uretilen imzanin gecerlilik suresi. Linkin toplam omruyle ilgisi yoktur; yavas baglantilarda indirme yarida kesilmesin diye yeterince uzun olmali.',
     kind: 'number',
     unit: 'dakika',
     min: 5,
@@ -160,7 +160,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'maxUploadMb',
     label: 'En buyuk dosya boyutu',
-    help: 'Bundan buyuk IPA dosyalari reddedilir. Ters proxy kullaniyorsaniz orada da client_max_body_size degerini ayarlamayi unutmayin.',
+    help: 'Bundan buyuk paket dosyalari (.ipa/.apk) reddedilir. Ters proxy kullaniyorsaniz orada da client_max_body_size degerini ayarlamayi unutmayin.',
     kind: 'number',
     unit: 'MB',
     min: 1,
@@ -170,7 +170,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'revokePreviousOnUpload',
     label: 'Onceki surumu otomatik iptal et',
-    help: 'Ayni bundle-id ile yeni bir IPA yuklendiginde, o uygulamanin onceki aktif linkleri kapatilir.',
+    help: 'Ayni paket kimligi (bundle id / package) ve ayni platformda yeni bir paket yuklendiginde, o uygulamanin onceki aktif linkleri kapatilir. iOS ve Android surumleri birbirini kapatmaz.',
     kind: 'boolean',
     group: 'yukleme',
   },

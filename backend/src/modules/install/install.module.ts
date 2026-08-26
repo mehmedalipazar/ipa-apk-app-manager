@@ -7,7 +7,9 @@
  * ve .ipa dosyalarini Safari degil, isletim sisteminin `installd` sureci ceker
  * ve o surec Safari'nin cerezlerini paylasmaz. Cerez tabanli koruma OTA
  * kurulumunu tamamen bozar. Yetki bu yuzden URL icindeki kisa omurlu HMAC
- * imzasindadir (`domain/links/token.ts`) ve `token + purpose` ciftine baglidir.
+ * imzasindadir (`domain/links/token.ts`) ve `token + purpose` ciftine baglidir
+ * (amaclar: manifest | ipa | apk | icon). Android'de manifest yoktur: kurulum
+ * sayfasindaki buton dogrudan imzali `app.apk` adresine gider.
  *
  * Yol oneki tek kaynaktan gelir: env.INSTALL_PATH_PREFIX. Hem rota kaydi hem
  * uretilen linkler ayni degeri okur — hicbir yere '/i' yazmayin.
@@ -19,15 +21,16 @@ import type { AppModule } from '../../shared/module.types.ts';
 import { env } from '../../config/env.ts';
 import { ConfigError } from '../../shared/errors.ts';
 import { getStatus } from '../../domain/links/service.ts';
-import { verifyAccess } from '../../domain/links/token.ts';
+import { verifyAccess, type AccessPurpose } from '../../domain/links/token.ts';
+import type { Platform } from '../../domain/package/types.ts';
 import { buildManifest } from '../../domain/ota/manifest.ts';
 import {
+  isAndroidUserAgent,
   isIosUserAgent,
   renderInstallPage,
   renderUnavailablePage,
 } from '../../domain/ota/install-page.ts';
 import { verifyPassword } from '../auth/password.ts';
-import { BuildService } from '../builds/build.service.ts';
 
 interface TokenParams {
   token: string;
@@ -87,8 +90,15 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
 
     try {
       pageUrl = ctx.links.publicUrl(build.token);
-      if (!sifreGerekli) installUrl = ctx.links.itmsServicesUrl(build.token);
-      if (build.iconPath) iconUrl = ctx.links.iconUrl(build.token);
+      if (!sifreGerekli) {
+        // iOS: itms-services zinciri (manifest.plist). Android: tarayicinin
+        // dogrudan indirdigi imzali .apk adresi — manifest kavrami yok.
+        installUrl =
+          build.platform === 'android'
+            ? ctx.links.apkUrl(build.token)
+            : ctx.links.itmsServicesUrl(build.token);
+      }
+      if (build.iconPath) iconUrl = ctx.links.iconUrl(build.token, build.iconPath);
     } catch (e) {
       if (e instanceof ConfigError) {
         // "Link bulunamadi" DEGIL: sorun kullanicinin adresi degil, sunucu
@@ -103,11 +113,13 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
       throw e;
     }
 
+    const ua = request.headers['user-agent'];
     const html = renderInstallPage({
       siteName: ayarlar.siteName,
       build,
       status: durum,
-      isIos: isIosUserAgent(request.headers['user-agent']),
+      isIos: isIosUserAgent(ua),
+      isAndroid: isAndroidUserAgent(ua),
       installUrl,
       iconUrl,
       pageUrl,
@@ -144,6 +156,8 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
     async (request, reply) => {
       const build = kaydiGetir(request.params.token);
       if (!build) return reply.code(404).send({ error: 'Bulunamadi' });
+      // Android paketinin manifest.plist'i yoktur: bu kayit icin boyle bir kaynak yok.
+      if (build.platform !== 'ios') return reply.code(404).send({ error: 'Bulunamadi' });
       if (getStatus(build) !== 'active') {
         return reply.code(410).send({ error: 'Bu linkin suresi dolmus.' });
       }
@@ -151,13 +165,14 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
         return reply.code(403).send({ error: 'Erisim anahtari gecersiz ya da suresi dolmus.' });
       }
 
+      const simgeUrl = build.iconPath ? ctx.links.iconUrl(build.token, build.iconPath) : null;
       const manifest = buildManifest({
         bundleId: build.bundleId,
         version: build.version,
         title: build.appName,
         ipaUrl: ctx.links.ipaUrl(build.token),
-        displayImageUrl: build.iconPath ? ctx.links.iconUrl(build.token) : null,
-        fullSizeImageUrl: build.iconPath ? ctx.links.iconUrl(build.token) : null,
+        displayImageUrl: simgeUrl,
+        fullSizeImageUrl: simgeUrl,
       });
 
       ctx.builds.increment(build.id, 'install_count');
@@ -169,89 +184,136 @@ async function register(app: FastifyInstance, ctx: AppContainer): Promise<void> 
     },
   );
 
-  /* --- .ipa dosyasi ------------------------------------------------------- */
+  /* --- Paket dosyasi: app.ipa / app.apk ----------------------------------- */
+  // Iki rota ayni govdeyi paylasir; farklari platform, imza amaci, uzanti ve
+  // content-type. Platform uyusmazligi (Android kaydinda app.ipa ya da tersi)
+  // 404'tur — o kayit icin boyle bir kaynak yok — ve durum/imza kontrolunden
+  // ONCE gelir. Imza amaci da ayridir: 'ipa' anahtari app.apk'yi acmaz.
 
-  app.get<{ Params: TokenParams; Querystring: { k?: string } }>(
-    `${P}/:token/app.ipa`,
-    async (request, reply) => {
-      const build = kaydiGetir(request.params.token);
-      if (!build) return reply.code(404).send({ error: 'Bulunamadi' });
-      if (getStatus(build) !== 'active') {
-        return reply.code(410).send({ error: 'Bu linkin suresi dolmus.' });
-      }
-      if (!verifyAccess(env.SESSION_SECRET, build.token, 'ipa', request.query.k)) {
-        return reply.code(403).send({ error: 'Erisim anahtari gecersiz ya da suresi dolmus.' });
-      }
+  interface PaketSecenegi {
+    readonly platform: Platform;
+    readonly purpose: AccessPurpose;
+    readonly uzanti: 'ipa' | 'apk';
+    readonly contentType: string;
+  }
 
-      const key = BuildService.ipaKey(build.id);
-      const toplam = await ctx.storage.size(key);
-      if (toplam === null) return reply.code(410).send({ error: 'Dosya sunucudan kaldirilmis.' });
+  const paketiGonder = async (
+    request: FastifyRequest<{ Params: TokenParams; Querystring: { k?: string } }>,
+    reply: FastifyReply,
+    secenek: PaketSecenegi,
+  ) => {
+    const build = kaydiGetir(request.params.token);
+    if (!build) return reply.code(404).send({ error: 'Bulunamadi' });
+    if (build.platform !== secenek.platform) return reply.code(404).send({ error: 'Bulunamadi' });
+    if (getStatus(build) !== 'active') {
+      return reply.code(410).send({ error: 'Bu linkin suresi dolmus.' });
+    }
+    if (!verifyAccess(env.SESSION_SECRET, build.token, secenek.purpose, request.query.k)) {
+      return reply.code(403).send({ error: 'Erisim anahtari gecersiz ya da suresi dolmus.' });
+    }
 
-      // Ad VE surum birlikte temizlenir: surumden gelebilecek tirnak/bosluk
-      // Content-Disposition basligini bozmasin (2026-08-20).
-      const dosyaAdi = `${`${build.appName}-${build.version}`.replace(/[^\w.-]+/g, '_')}.ipa`;
+    const key = build.packagePath;
+    const toplam = await ctx.storage.size(key);
+    if (toplam === null) return reply.code(410).send({ error: 'Dosya sunucudan kaldirilmis.' });
 
-      // Kismi indirme (Range) destegi — buyuk dosyalarda kopan indirmeler
-      // bastan baslamasin diye.
-      const range = parseRange(request.headers.range, toplam);
-      if (range === 'karsilanamaz') {
-        // RFC 9110 14.4: dosya disinda baslayan aralik 416 + bytes */size.
-        return reply
-          .code(416)
-          .header('content-range', `bytes */${toplam}`)
-          .send({ error: 'Istenen aralik dosya boyutunun disinda.' });
-      }
+    // Ad VE surum birlikte temizlenir: surumden gelebilecek tirnak/bosluk
+    // Content-Disposition basligini bozmasin (2026-08-20).
+    const dosyaAdi = `${`${build.appName}-${build.version}`.replace(/[^\w.-]+/g, '_')}.${secenek.uzanti}`;
 
-      // Sayac "indirme"yi olcer: dosyanin BASINDAN baslayan govdeli istekler.
-      // iOS installd buyuk dosyayi Range parcalariyla ceker; her parcayi ayri
-      // indirme saymak sayaci anlamsizca sisiriyordu. HEAD hic sayilmaz (2026-08-20).
-      const indirmeSayilir = request.method !== 'HEAD' && (range === null || range.start === 0);
+    // Kismi indirme (Range) destegi — buyuk dosyalarda kopan indirmeler
+    // bastan baslamasin diye.
+    const range = parseRange(request.headers.range, toplam);
+    if (range === 'karsilanamaz') {
+      // RFC 9110 14.4: dosya disinda baslayan aralik 416 + bytes */size.
+      return reply
+        .code(416)
+        .header('content-range', `bytes */${toplam}`)
+        .send({ error: 'Istenen aralik dosya boyutunun disinda.' });
+    }
 
-      if (range) {
-        const stream = await ctx.storage.createReadStream(key, range);
-        if (!stream) return reply.code(410).send({ error: 'Dosya bulunamadi.' });
-        if (indirmeSayilir) ctx.builds.increment(build.id, 'download_count');
-        return reply
-          .code(206)
-          .type('application/octet-stream')
-          .header('content-range', `bytes ${range.start}-${range.end}/${toplam}`)
-          .header('content-length', String(range.end - range.start + 1))
-          .header('accept-ranges', 'bytes')
-          .header('content-disposition', `attachment; filename="${dosyaAdi}"`)
-          .send(stream);
-      }
+    // Sayac "indirme"yi olcer: dosyanin BASINDAN baslayan govdeli istekler.
+    // iOS installd buyuk dosyayi Range parcalariyla ceker; her parcayi ayri
+    // indirme saymak sayaci anlamsizca sisiriyordu. HEAD hic sayilmaz (2026-08-20).
+    const indirmeSayilir = request.method !== 'HEAD' && (range === null || range.start === 0);
 
-      const stream = await ctx.storage.createReadStream(key);
+    if (range) {
+      const stream = await ctx.storage.createReadStream(key, range);
       if (!stream) return reply.code(410).send({ error: 'Dosya bulunamadi.' });
-
       if (indirmeSayilir) ctx.builds.increment(build.id, 'download_count');
       return reply
-        .type('application/octet-stream')
-        .header('content-length', String(toplam))
+        .code(206)
+        .type(secenek.contentType)
+        .header('content-range', `bytes ${range.start}-${range.end}/${toplam}`)
+        .header('content-length', String(range.end - range.start + 1))
         .header('accept-ranges', 'bytes')
         .header('content-disposition', `attachment; filename="${dosyaAdi}"`)
         .send(stream);
-    },
+    }
+
+    const stream = await ctx.storage.createReadStream(key);
+    if (!stream) return reply.code(410).send({ error: 'Dosya bulunamadi.' });
+
+    if (indirmeSayilir) ctx.builds.increment(build.id, 'download_count');
+    return reply
+      .type(secenek.contentType)
+      .header('content-length', String(toplam))
+      .header('accept-ranges', 'bytes')
+      .header('content-disposition', `attachment; filename="${dosyaAdi}"`)
+      .send(stream);
+  };
+
+  app.get<{ Params: TokenParams; Querystring: { k?: string } }>(
+    `${P}/:token/app.ipa`,
+    (request, reply) =>
+      paketiGonder(request, reply, {
+        platform: 'ios',
+        purpose: 'ipa',
+        uzanti: 'ipa',
+        contentType: 'application/octet-stream',
+      }),
+  );
+
+  app.get<{ Params: TokenParams; Querystring: { k?: string } }>(
+    `${P}/:token/app.apk`,
+    (request, reply) =>
+      paketiGonder(request, reply, {
+        platform: 'android',
+        purpose: 'apk',
+        uzanti: 'apk',
+        // Android'in paket yukleyicisini tetikleyen resmi tur.
+        contentType: 'application/vnd.android.package-archive',
+      }),
   );
 
   /* --- Simge -------------------------------------------------------------- */
+  // iOS simgesi hep PNG'dir (CgBI donusumu); Android'de PNG ya da WebP olabilir.
+  // Dosya adi kayittaki iconPath'ten gelir; istenen ad onunla eslesmiyorsa 404.
 
-  app.get<{ Params: TokenParams; Querystring: { k?: string } }>(
-    `${P}/:token/icon.png`,
-    async (request, reply) => {
-      const build = kaydiGetir(request.params.token);
-      if (!build?.iconPath) return reply.code(404).send({ error: 'Simge yok' });
-      if (getStatus(build) !== 'active') return reply.code(410).send({ error: 'Suresi dolmus.' });
-      if (!verifyAccess(env.SESSION_SECRET, build.token, 'icon', request.query.k)) {
-        return reply.code(403).send({ error: 'Erisim anahtari gecersiz.' });
-      }
+  const SIMGE_TURLERI = [
+    ['icon.png', 'image/png'],
+    ['icon.webp', 'image/webp'],
+  ] as const;
 
-      const stream = await ctx.storage.createReadStream(BuildService.iconKey(build.id));
-      if (!stream) return reply.code(404).send({ error: 'Simge bulunamadi' });
+  for (const [dosya, mime] of SIMGE_TURLERI) {
+    app.get<{ Params: TokenParams; Querystring: { k?: string } }>(
+      `${P}/:token/${dosya}`,
+      async (request, reply) => {
+        const build = kaydiGetir(request.params.token);
+        if (!build?.iconPath || !build.iconPath.endsWith(`/${dosya}`)) {
+          return reply.code(404).send({ error: 'Simge yok' });
+        }
+        if (getStatus(build) !== 'active') return reply.code(410).send({ error: 'Suresi dolmus.' });
+        if (!verifyAccess(env.SESSION_SECRET, build.token, 'icon', request.query.k)) {
+          return reply.code(403).send({ error: 'Erisim anahtari gecersiz.' });
+        }
 
-      return reply.type('image/png').header('cache-control', 'private, max-age=600').send(stream);
-    },
-  );
+        const stream = await ctx.storage.createReadStream(build.iconPath);
+        if (!stream) return reply.code(404).send({ error: 'Simge bulunamadi' });
+
+        return reply.type(mime).header('cache-control', 'private, max-age=600').send(stream);
+      },
+    );
+  }
 
   /* --- QR kod ------------------------------------------------------------- */
   // Bilerek imzasiz: QR yalnizca kurulum sayfasinin kendi adresini kodlar,

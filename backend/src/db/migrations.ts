@@ -69,6 +69,16 @@ const MIGRATIONS: readonly Migration[] = [
        WHERE ttl_hours IS NULL;
     `,
   },
+  {
+    // Android (.apk) destegi: her kayit bir platforma aittir; eski satirlar iOS.
+    // ipa_path sutununun adi tarihsel kalir (migration'lar ileri yonlu) — TS
+    // tarafinda BuildRecord.packagePath olarak okunur/yazilir.
+    name: '003_builds_platform',
+    up: `
+      ALTER TABLE builds ADD COLUMN platform TEXT NOT NULL DEFAULT 'ios';
+      CREATE INDEX idx_builds_platform_bundle_id ON builds (platform, bundle_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: Db): void {

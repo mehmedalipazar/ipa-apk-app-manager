@@ -1,13 +1,28 @@
 /**
- * Ana ekran: IPA yukle -> kurulum linki al.
+ * Ana ekran: paket (IPA/APK) yukle -> kurulum linki al.
  *
  * Yalnizca yonetici gorur; App.tsx oturum yoksa giris ekranini gosterir.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Dropzone } from '../components/Dropzone.tsx';
-import { Alert, AlertList, AppIcon, CopyButton, Spinner } from '../components/common.tsx';
+import {
+  Alert,
+  AlertList,
+  AppIcon,
+  CopyButton,
+  PlatformBadge,
+  Spinner,
+} from '../components/common.tsx';
 import { IconBox, IconLink } from '../components/icons.tsx';
-import { ApiError, api, formatBytes, formatHours, uploadIpa, type AppConfig, type BuildDto } from '../api.ts';
+import {
+  ApiError,
+  api,
+  formatBytes,
+  formatHours,
+  uploadPackage,
+  type AppConfig,
+  type BuildDto,
+} from '../api.ts';
 import { SURE_ONAYARLARI } from '../ttl.ts';
 import { Link } from '../router.tsx';
 
@@ -47,8 +62,10 @@ export function UploadPage() {
 
   const dosyaSecildi = (secilen: File) => {
     setHata(null);
-    if (!secilen.name.toLowerCase().endsWith('.ipa')) {
-      setHata(`"${secilen.name}" bir .ipa dosyasi degil. iOS uygulama paketi secin.`);
+    if (!/\.(ipa|apk)$/i.test(secilen.name)) {
+      setHata(
+        `"${secilen.name}" bir .ipa veya .apk dosyasi degil. iOS ya da Android uygulama paketi secin.`,
+      );
       return;
     }
     const maxMb = limitler?.maxUploadMb;
@@ -78,7 +95,7 @@ export function UploadPage() {
     iptalRef.current = controller;
 
     try {
-      const yanit = await uploadIpa({
+      const yanit = await uploadPackage({
         file: dosya,
         ttlHours: gecerliTtl,
         note: not,
@@ -117,7 +134,11 @@ export function UploadPage() {
       <div className="main narrow">
         <div className="page-head">
           <h1>Link hazir</h1>
-          <p>Bu adresi paylasin; alici iPhone'da mobil tarayicisiyla acip tek dokunusla kursun.</p>
+          <p>
+            {sonuc.platform === 'ios'
+              ? "Bu adresi paylasin; alici iPhone'da mobil tarayicisiyla acip tek dokunusla kursun."
+              : 'Bu adresi paylasin; alici Android cihazinda tarayicisiyla acip APK dosyasini indirip kursun.'}
+          </p>
         </div>
 
         <AlertList warnings={uyarilar} />
@@ -128,8 +149,11 @@ export function UploadPage() {
               <AppIcon src={sonuc.iconUrl} name={sonuc.appName} className="app-icon" />
               <div className="meta">
                 <h2>{sonuc.appName}</h2>
-                <div className="sub">
-                  Surum {sonuc.version} ({sonuc.buildNumber}) &middot; {sonuc.sizeLabel}
+                <div className="sub" style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                  <PlatformBadge platform={sonuc.platform} />
+                  <span>
+                    Surum {sonuc.version} ({sonuc.buildNumber}) &middot; {sonuc.sizeLabel}
+                  </span>
                 </div>
                 <div className="sub">{sonuc.bundleId}</div>
               </div>
@@ -159,8 +183,9 @@ export function UploadPage() {
                     <div className="qr-text">
                       <strong style={{ color: 'var(--fg)' }}>Telefonla okutun</strong>
                       <br />
-                      iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda
-                      acilir ve kurulum baslar.
+                      {sonuc.platform === 'ios'
+                        ? 'iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda acilir ve kurulum baslar.'
+                        : 'Android cihazin kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa tarayicida acilir ve indirme baslar.'}
                     </div>
                   </div>
                 )}
@@ -194,8 +219,8 @@ export function UploadPage() {
   return (
     <div className="main narrow">
       <div className="page-head">
-        <h1>IPA yukle</h1>
-        <p>iOS uygulamanizi yukleyin, paylasilabilir bir kurulum linki alin.</p>
+        <h1>Uygulama paketi yukle</h1>
+        <p>iOS (.ipa) ya da Android (.apk) paketinizi yukleyin, paylasilabilir bir kurulum linki alin.</p>
       </div>
 
       {hata && (

@@ -1,17 +1,22 @@
 /**
- * Yuklenen IPA kayitlari.
+ * Yuklenen paket (IPA / APK) kayitlari.
  *
  * Tarih alanlari epoch milisaniye (INTEGER) olarak saklanir; zaman dilimi
  * belirsizligi olmasin diye TEXT tarih kullanilmiyor.
  */
 import type { Db } from '../client.ts';
+import type { Platform } from '../../domain/package/types.ts';
 
 export interface BuildRecord {
   id: string;
   token: string;
+  /** 'ios' (.ipa) ya da 'android' (.apk) — migration 003, eski satirlar 'ios'. */
+  platform: Platform;
 
   originalFilename: string;
-  ipaPath: string;
+  /** Paket dosyasinin depolama anahtari (app.ipa / app.apk). DB sutunu: ipa_path (tarihsel ad). */
+  packagePath: string;
+  /** Simge anahtari (icon.png / icon.webp); simge yoksa null. */
   iconPath: string | null;
   sizeBytes: number;
   sha256: string;
@@ -55,6 +60,7 @@ export type CounterName = 'view_count' | 'install_count' | 'download_count';
 interface BuildRow {
   id: string;
   token: string;
+  platform: string;
   original_filename: string;
   ipa_path: string;
   icon_path: string | null;
@@ -93,8 +99,9 @@ function toRecord(row: BuildRow): BuildRecord {
   return {
     id: row.id,
     token: row.token,
+    platform: row.platform === 'android' ? 'android' : 'ios',
     originalFilename: row.original_filename,
-    ipaPath: row.ipa_path,
+    packagePath: row.ipa_path,
     iconPath: row.icon_path,
     sizeBytes: row.size_bytes,
     sha256: row.sha256,
@@ -124,8 +131,10 @@ export interface ListOptions {
   offset?: number;
   /** true ise suresi dolmus/iptal edilmisler de gelir. Varsayilan: true */
   includeInactive?: boolean;
-  /** Uygulama adi / bundle id / surum icinde arama */
+  /** Uygulama adi / bundle id / surum icinde arama (platformlar arasi) */
   search?: string;
+  /** Yalnizca bu platformun kayitlari. Verilmezse ikisi de gelir. */
+  platform?: Platform;
 }
 
 export class BuildsRepository {
@@ -139,11 +148,11 @@ export class BuildsRepository {
     this.db
       .prepare(
         `INSERT INTO builds (
-          id, token, original_filename, ipa_path, icon_path, size_bytes, sha256,
+          id, token, platform, original_filename, ipa_path, icon_path, size_bytes, sha256,
           bundle_id, app_name, version, build_number, min_os_version, platforms,
           created_at, expires_at, ttl_hours, password_hash, note, uploaded_by
         ) VALUES (
-          @id, @token, @original_filename, @ipa_path, @icon_path, @size_bytes, @sha256,
+          @id, @token, @platform, @original_filename, @ipa_path, @icon_path, @size_bytes, @sha256,
           @bundle_id, @app_name, @version, @build_number, @min_os_version, @platforms,
           @created_at, @expires_at, @ttl_hours, @password_hash, @note, @uploaded_by
         )`,
@@ -151,8 +160,9 @@ export class BuildsRepository {
       .run({
         id: build.id,
         token: build.token,
+        platform: build.platform,
         original_filename: build.originalFilename,
-        ipa_path: build.ipaPath,
+        ipa_path: build.packagePath,
         icon_path: build.iconPath,
         size_bytes: build.sizeBytes,
         sha256: build.sha256,
@@ -186,11 +196,15 @@ export class BuildsRepository {
   }
 
   list(options: ListOptions = {}): { items: BuildRecord[]; total: number } {
-    const { limit = 50, offset = 0, includeInactive = true, search } = options;
+    const { limit = 50, offset = 0, includeInactive = true, search, platform } = options;
 
     const kosullar: string[] = [];
     const parametreler: unknown[] = [];
 
+    if (platform) {
+      kosullar.push('platform = ?');
+      parametreler.push(platform);
+    }
     if (!includeInactive) {
       // "Aktif" tanimi getStatus() ile birebir ayni olmali: suresi gecmemis,
       // iptal edilmemis VE dosyalari silinmemis.
@@ -252,14 +266,18 @@ export class BuildsRepository {
     this.db.prepare('DELETE FROM builds WHERE id = ?').run(id);
   }
 
-  /** Ayni uygulamanin hala aktif olan diger linklerini iptal eder. */
-  revokeOthersByBundleId(bundleId: string, exceptId: string, at: number): number {
+  /**
+   * Ayni uygulamanin (ayni paket kimligi VE ayni platform) hala aktif olan diger
+   * linklerini iptal eder. Platform sarti onemli: com.ornek.uygulama hem iOS hem
+   * Android'de ayni kimlikle yayimlanir; biri digerini kapatmamali.
+   */
+  revokeOthersByBundleId(bundleId: string, platform: Platform, exceptId: string, at: number): number {
     const sonuc = this.db
       .prepare(
         `UPDATE builds SET revoked_at = ?
-         WHERE bundle_id = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?`,
+         WHERE bundle_id = ? AND platform = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?`,
       )
-      .run(at, bundleId, exceptId, at);
+      .run(at, bundleId, platform, exceptId, at);
     return sonuc.changes;
   }
 

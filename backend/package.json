@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "description": "iOS OTA IPA dagitim servisi - API (Fastify). Bagimsiz servis; frontend ile tek baglantisi HTTP'dir.",
+  "description": "iOS/Android OTA paket (IPA/APK) dagitim servisi - API (Fastify). Bagimsiz servis; frontend ile tek baglantisi HTTP'dir.",
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env.development --env-file-if-exists=.env.local --experimental-strip-types src/index.ts",
     "build": "tsc -p tsconfig.json",

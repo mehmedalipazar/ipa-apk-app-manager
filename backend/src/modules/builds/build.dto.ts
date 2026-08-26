@@ -8,6 +8,7 @@
  * (tipleri degil).
  */
 import type { BuildRecord } from '../../db/repositories/builds.repository.ts';
+import type { Platform } from '../../domain/package/types.ts';
 import type { LinkService } from '../../domain/links/service.ts';
 import { getStatus, STATUS_LABELS, type BuildStatus } from '../../domain/links/service.ts';
 import { formatBytes, formatRemaining } from '../../shared/format.ts';
@@ -15,6 +16,8 @@ import { formatBytes, formatRemaining } from '../../shared/format.ts';
 export interface BuildDto {
   id: string;
   token: string;
+  /** 'ios' (.ipa) ya da 'android' (.apk). */
+  platform: Platform;
 
   appName: string;
   bundleId: string;
@@ -59,7 +62,7 @@ export function toBuildDto(build: BuildRecord, links: LinkService): BuildDto {
   try {
     installUrl = links.publicUrl(build.token);
     qrUrl = `${installUrl}/qr.svg`;
-    if (build.iconPath && status === 'active') iconUrl = links.iconUrl(build.token);
+    if (build.iconPath && status === 'active') iconUrl = links.iconUrl(build.token, build.iconPath);
   } catch {
     // Sessizce null birak — uyari ayrica warnings[] ile gider.
   }
@@ -67,6 +70,7 @@ export function toBuildDto(build: BuildRecord, links: LinkService): BuildDto {
   return {
     id: build.id,
     token: build.token,
+    platform: build.platform,
     appName: build.appName,
     bundleId: build.bundleId,
     version: build.version,

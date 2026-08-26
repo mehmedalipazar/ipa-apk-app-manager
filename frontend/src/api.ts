@@ -6,6 +6,8 @@
  * degistiginde bu dosya da guncellenmeli. Derleyici bu kaymayi yakalamaz;
  * tests/suite-c-api.mjs C10 (AppConfig) ve C10b (BuildDto) yalnizca alan
  * ADLARINI karsilastirir — tip degisikligi yine elle takip edilir.
+ * `BuildDto.platform` ('ios' | 'android') da bu aynanin parcasidir: iki
+ * tarafta da `token`'dan hemen sonra tek satirdir (C10b satir satir okur).
  */
 
 /* --- API adresi ----------------------------------------------------------- */
@@ -39,9 +41,13 @@ function apiUrl(path: string): string {
 
 export type BuildStatus = 'active' | 'expired' | 'revoked' | 'purged';
 
+/** Paket platformu; sunucu dosya uzantisindan belirler (.ipa -> ios, .apk -> android). */
+export type Platform = 'ios' | 'android';
+
 export interface BuildDto {
   id: string;
   token: string;
+  platform: Platform;
   appName: string;
   bundleId: string;
   version: string;
@@ -255,10 +261,13 @@ export const api = {
 
   /* --- Surumler ----------------------------------------------------------- */
 
-  listBuilds: (options: { search?: string; onlyActive?: boolean; limit?: number } = {}) => {
+  listBuilds: (
+    options: { search?: string; onlyActive?: boolean; limit?: number; platform?: Platform } = {},
+  ) => {
     const q = new URLSearchParams();
     if (options.search) q.set('search', options.search);
     if (options.onlyActive) q.set('onlyActive', 'true');
+    if (options.platform) q.set('platform', options.platform);
     q.set('limit', String(options.limit ?? 100));
     return request<{ items: BuildDto[]; total: number }>(`/api/builds?${q}`);
   },
@@ -296,9 +305,10 @@ export interface UploadOptions {
 
 /**
  * fetch() yukleme ilerlemesi bildirmedigi icin XMLHttpRequest kullaniliyor.
- * Buyuk IPA dosyalarinda ilerleme cubugu olmadan arayuz donmus gorunur.
+ * Buyuk paket dosyalarinda (IPA/APK) ilerleme cubugu olmadan arayuz donmus
+ * gorunur. Platform ayrica gonderilmez; sunucu dosya uzantisindan belirler.
  */
-export function uploadIpa(options: UploadOptions): Promise<UploadResponse> {
+export function uploadPackage(options: UploadOptions): Promise<UploadResponse> {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     // Alanlar dosyadan ONCE eklenir: sunucu boylece kaydi tek gecisde kurabilir.

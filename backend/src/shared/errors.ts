@@ -42,5 +42,7 @@ export class AuthError extends AppError {
 }
 
 // Alan modullerinde tanimli hatalar da buradan tek noktadan alinabilsin.
+export { PackageParseError } from '../domain/package/types.ts';
 export { IpaParseError } from '../domain/ipa/types.ts';
+export { ApkParseError } from '../domain/apk/types.ts';
 export { StorageLimitError } from '../domain/storage/types.ts';

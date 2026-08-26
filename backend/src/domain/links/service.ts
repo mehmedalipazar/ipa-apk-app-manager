@@ -58,8 +58,14 @@ export class LinkService {
     return this.signedUrl(token, 'ipa', 'app.ipa');
   }
 
-  iconUrl(token: string): string {
-    return this.signedUrl(token, 'icon', 'icon.png');
+  /** Android: tarayicinin dogrudan indirdigi imzali .apk adresi (manifest yok). */
+  apkUrl(token: string): string {
+    return this.signedUrl(token, 'apk', 'app.apk');
+  }
+
+  /** Simge adresi; dosya adi (icon.png / icon.webp) kayittaki iconPath'ten turer. */
+  iconUrl(token: string, iconPath: string): string {
+    return this.signedUrl(token, 'icon', iconPath.slice(iconPath.lastIndexOf('/') + 1));
   }
 
   /**

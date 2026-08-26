@@ -5,7 +5,15 @@
  * ve buradaki "Duzenle" panelinden degistirilebilir.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, AppIcon, CopyButton, EmptyState, Spinner, StatusBadge } from '../components/common.tsx';
+import {
+  Alert,
+  AppIcon,
+  CopyButton,
+  EmptyState,
+  PlatformBadge,
+  Spinner,
+  StatusBadge,
+} from '../components/common.tsx';
 import {
   IconBan,
   IconClock,
@@ -26,10 +34,18 @@ import {
   type AppConfig,
   type BuildDto,
   type BuildPatch,
+  type Platform,
   type StatsResponse,
   type TtlBasis,
 } from '../api.ts';
 import { SURE_ONAYARLARI } from '../ttl.ts';
+
+/** Liste filtresi secenekleri; '' = tum platformlar (sorguya eklenmez). */
+const PLATFORM_FILTRELERI: ReadonlyArray<{ deger: Platform | ''; etiket: string }> = [
+  { deger: '', etiket: 'Tumu' },
+  { deger: 'ios', etiket: 'iOS' },
+  { deger: 'android', etiket: 'Android' },
+];
 
 export function BuildsPage() {
   const toast = useToast();
@@ -45,6 +61,7 @@ export function BuildsPage() {
   const [hata, setHata] = useState<string | null>(null);
   const [arama, setArama] = useState('');
   const [sadeceAktif, setSadeceAktif] = useState(false);
+  const [platform, setPlatform] = useState<Platform | ''>('');
   const [islemdeki, setIslemdeki] = useState<string | null>(null);
   const [duzenlenen, setDuzenlenen] = useState<string | null>(null);
 
@@ -53,7 +70,11 @@ export function BuildsPage() {
     setHata(null);
     try {
       const [liste, ozet, ayarlar] = await Promise.all([
-        api.listBuilds({ search: arama || undefined, onlyActive: sadeceAktif }),
+        api.listBuilds({
+          search: arama || undefined,
+          onlyActive: sadeceAktif,
+          platform: platform || undefined,
+        }),
         api.getStats(),
         api.getSettings(),
       ]);
@@ -65,7 +86,7 @@ export function BuildsPage() {
     } finally {
       setYukleniyor(false);
     }
-  }, [arama, sadeceAktif]);
+  }, [arama, sadeceAktif, platform]);
 
   useEffect(() => {
     // Yazarken her tusa istek atmamak icin kisa gecikme.
@@ -92,7 +113,7 @@ export function BuildsPage() {
   const sil = (build: BuildDto) => {
     const onay = window.confirm(
       `"${build.appName} ${build.version}" kalici olarak silinecek.\n\n` +
-        'Kurulum linki calismayacak ve IPA dosyasi diskten kaldirilacak. Devam edilsin mi?',
+        'Kurulum linki calismayacak ve paket dosyasi (.ipa/.apk) diskten kaldirilacak. Devam edilsin mi?',
     );
     if (!onay) return;
     void islem(build.id, () => api.deleteBuild(build.id), 'Surum silindi');
@@ -129,7 +150,7 @@ export function BuildsPage() {
         <p>
           {stats
             ? `${stats.total} surum, ${stats.active} aktif link, diskte ${formatBytes(stats.totalBytes)}.`
-            : 'Yuklenen tum IPA dosyalari ve kurulum linkleri.'}
+            : 'Yuklenen tum uygulama paketleri (.ipa/.apk) ve kurulum linkleri.'}
         </p>
       </div>
 
@@ -158,6 +179,19 @@ export function BuildsPage() {
               <strong style={{ margin: 0 }}>Sadece aktif</strong>
             </span>
           </label>
+          <div className="seg">
+            {PLATFORM_FILTRELERI.map((f) => (
+              <label key={f.etiket} className={platform === f.deger ? 'on' : ''}>
+                <input
+                  type="radio"
+                  name="platform-filtre"
+                  checked={platform === f.deger}
+                  onChange={() => setPlatform(f.deger)}
+                />
+                {f.etiket}
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -167,7 +201,7 @@ export function BuildsPage() {
         </EmptyState>
       ) : items.length === 0 ? (
         <EmptyState title="Henuz surum yok">
-          <p>Ilk IPA dosyanizi yukleyin; kurulum linki burada listelenecek.</p>
+          <p>Ilk paketinizi (.ipa ya da .apk) yukleyin; kurulum linki burada listelenecek.</p>
         </EmptyState>
       ) : (
         <div className="build-list">
@@ -182,6 +216,7 @@ export function BuildsPage() {
                     <span className="unit">
                       {build.version} ({build.buildNumber})
                     </span>
+                    <PlatformBadge platform={build.platform} />
                     <StatusBadge status={build.status} label={build.statusLabel} />
                     {build.hasPassword && (
                       <span className="badge">
@@ -227,8 +262,9 @@ export function BuildsPage() {
                 <div className="qr-panel" style={{ marginTop: 13 }}>
                   <img src={build.qrUrl} alt={`${build.appName} kurulum linki QR kodu`} />
                   <div className="qr-text">
-                    iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda
-                    acilir ve kurulum tek dokunusla baslar.
+                    {build.platform === 'ios'
+                      ? 'iPhone kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa mobil tarayicinizda acilir ve kurulum tek dokunusla baslar.'
+                      : 'Android cihazin kamerasini QR koda tutun, cikan bildirime dokunun. Sayfa tarayicida acilir ve indirme baslar.'}
                   </div>
                 </div>
               )}
