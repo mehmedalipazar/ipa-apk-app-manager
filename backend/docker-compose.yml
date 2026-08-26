@@ -66,7 +66,7 @@ services:
       # backend/data-docker icinde durur, boylece SQLite dosyasi dogrudan
       # acilabilir — AMA YALNIZCA container DURDURULDUKTAN SONRA:
       #     docker compose stop api
-      #     sqlite3 data-docker/ipa-ota.db "select app_name, version from builds;"
+      #     sqlite3 data-docker/ipa-apk.db "select app_name, version from builds;"
       #
       # Container CALISIRKEN host'tan sqlite3 ile baglanmak VERI KAYBETTIRIR:
       # POSIX kilitleri bind mount uzerinden gecmez, host tarafi kendini yalniz
@@ -125,7 +125,7 @@ services:
       SQLITE_WEB_PASSWORD: ${DBADMIN_PASSWORD:?DBADMIN_PASSWORD tanimlanmali - backend/.env dosyasina yazin}
     # -r : salt okunur (bkz. yukaridaki olcum)   -x : tarayici acmaya calisma
     # -P : sifre sor (SQLITE_WEB_PASSWORD'dan okur)
-    command: sqlite_web -H 0.0.0.0 -p 8080 -x -r -P /data/ipa-ota.db
+    command: sqlite_web -H 0.0.0.0 -p 8080 -x -r -P /data/ipa-apk.db
     volumes:
       # DIKKAT: bilerek `:ro` DEGIL. WAL modunda bir OKUYUCU bile -shm
       # dosyasina (wal-index) yazabilmek zorundadir; salt okunur mount ile

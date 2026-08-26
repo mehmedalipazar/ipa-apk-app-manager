@@ -522,8 +522,8 @@ Docker Desktop's Linux VM and cannot be opened from macOS. The directory moved f
 to `backend/data-docker/` in the 2026-08-13 split (35 MB, backed up first). With the bind mount:
 
 ```bash
-sqlite3 backend/data-docker/ipa-ota.db "select app_name, version, expires_at from builds;"   # ONLY while api is stopped
-sqlite3 backend/data/ipa-ota.db "..."        # local dev
+sqlite3 backend/data-docker/ipa-apk.db "select app_name, version, expires_at from builds;"   # ONLY while api is stopped
+sqlite3 backend/data/ipa-apk.db "..."        # local dev
 ```
 
 > **WARNING — host `sqlite3` against the LIVE database has destroyed data (2026-08-10).**
@@ -534,14 +534,14 @@ sqlite3 backend/data/ipa-ota.db "..."        # local dev
 >
 > ```bash
 > docker compose exec -T api node -e 'const {DatabaseSync}=require("node:sqlite");
->   const db=new DatabaseSync("/data/ipa-ota.db",{readOnly:true});
+>   const db=new DatabaseSync("/data/ipa-apk.db",{readOnly:true});
 >   console.log(db.prepare("select app_name, version from builds").all());'
 > ```
 >
 > Host `sqlite3` is safe only after `cd backend && docker compose stop api`.
 
-SQLite runs in **WAL mode**. If you copy the database elsewhere, copy `ipa-ota.db-wal` and
-`ipa-ota.db-shm` too — the `.db` file alone is missing the most recent writes. **Back up
+SQLite runs in **WAL mode**. If you copy the database elsewhere, copy `ipa-apk.db-wal` and
+`ipa-apk.db-shm` too — the `.db` file alone is missing the most recent writes. **Back up
 `backend/data-docker/`.**
 
 ### The bind mount breaks SQLite locking — measured, not inferred (2026-08-13)

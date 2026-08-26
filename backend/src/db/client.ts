@@ -1,7 +1,7 @@
 /**
  * SQLite baglantisi. Tek dosya, tek process — self-hosted kullanim icin yeterli.
  *
- * Dosya `DATA_DIR/ipa-ota.db` konumundadir. Gelistirmede DATA_DIR=./data
+ * Dosya `DATA_DIR/ipa-apk.db` konumundadir. Gelistirmede DATA_DIR=./data
  * oldugu icin veritabani depo icinde durur ve sunucu KAPALIYKEN dogrudan
  * `sqlite3` ile acilabilir; uretimde /data'ya baglanan bind mount ayni dosyayi
  * host'ta gosterir — AMA container calisirken host'tan ACMAYIN: POSIX
@@ -22,7 +22,7 @@ import { runMigrations } from './migrations.ts';
 
 export type Db = Database.Database;
 
-export const DB_FILENAME = 'ipa-ota.db';
+export const DB_FILENAME = 'ipa-apk.db';
 
 let instance: Db | null = null;
 

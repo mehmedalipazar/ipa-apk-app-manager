@@ -71,7 +71,7 @@ uzerinden kanitlamak. "Deger set edildi" yeterli degil — davranis degismeli.
 | A1 | Yukleme sirasi (Node `--env-file-if-exists`): mode dosyasi → `.env.local` → shell | Ayni anahtari uc yerde farkli deger yap; `backend/package.json` dev/start scriptlerinde `.env.local`in mode dosyasindan SONRA geldigini de kontrol et | Shell kazanir; `.env.local` mode dosyasini ezer |
 | A2 | `PORT` okunuyor mu | `PORT=3999` ile baslat | `:3999/healthz` 200, `:3000` kapali |
 | A3 | `HOST` okunuyor mu | `HOST=127.0.0.1` | Yalnizca loopback'te dinler |
-| A4 | `DATA_DIR` okunuyor mu | `DATA_DIR=./tmp-veri` | O dizinde `ipa-ota.db` + `uploads/` olusur |
+| A4 | `DATA_DIR` okunuyor mu | `DATA_DIR=./tmp-veri` | O dizinde `ipa-apk.db` + `uploads/` olusur |
 | A5 | `LOG_LEVEL` okunuyor mu | `LOG_LEVEL=fatal` vs `debug` | debug'da istek loglari cikar, fatal'de cikmaz |
 | A6 | `TRUST_PROXY` okunuyor mu | `true`/`false` + `X-Forwarded-For` gonder | true iken log'daki `remoteAddress`/`req.ip` basliktaki IP olur |
 | A7 | `PUBLIC_BASE_URL` **DB bosken** okunuyor mu | Temiz DB + `PUBLIC_BASE_URL=https://a.test` | `GET /api/settings.values.baseUrl == https://a.test` |

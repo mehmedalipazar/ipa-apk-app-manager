@@ -170,7 +170,7 @@ docker compose start api
 >
 > ```bash
 > docker compose exec -T api node -e 'const {DatabaseSync}=require("node:sqlite");
->   const db=new DatabaseSync("/data/ipa-ota.db",{readOnly:true});
+>   const db=new DatabaseSync("/data/ipa-apk.db",{readOnly:true});
 >   console.log(db.prepare("select app_name, version from builds").all());'
 > ```
 >

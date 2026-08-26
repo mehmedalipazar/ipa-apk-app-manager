@@ -778,7 +778,7 @@ export async function calistir({ taban }) {
       // yerine dogrudan DB uzerinden degil, ttlFrom='upload' + 1 saat ile
       // gecmise dusuremeyiz. Kucuk bir bekleme yerine SQL kullanilir.
       const Database = backendRequire('better-sqlite3');
-      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      const db = new Database(join(s.veriDizini, 'ipa-apk.db'));
       db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 1000, b.id);
       db.close();
 
@@ -799,7 +799,7 @@ export async function calistir({ taban }) {
       const y = await c.yukle(join(FIX, 'demo-b.ipa'), { ttlHours: 1 });
       const b = y.govde.build;
       const Database = backendRequire('better-sqlite3');
-      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      const db = new Database(join(s.veriDizini, 'ipa-apk.db'));
       db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 100_000_000, b.id);
       db.close();
 
@@ -1341,7 +1341,7 @@ export async function calistir({ taban }) {
       esit(y.status, 201, 'upload');
       const b = y.govde.build;
       const Database = backendRequire('better-sqlite3');
-      const db = new Database(join(s.veriDizini, 'ipa-ota.db'));
+      const db = new Database(join(s.veriDizini, 'ipa-apk.db'));
       db.prepare('UPDATE builds SET expires_at = ? WHERE id = ?').run(Date.now() - 100_000_000, b.id);
       db.close();
 

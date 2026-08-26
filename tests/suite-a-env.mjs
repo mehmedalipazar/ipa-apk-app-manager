@@ -78,7 +78,7 @@ export async function calistir() {
     try {
       return await sunucuIle({}, async (s) => {
         bekle(s.hazir, 'kalkmadi');
-        bekle(existsSync(join(dizin, 'ipa-ota.db')), `${dizin}/ipa-ota.db olusmadi`);
+        bekle(existsSync(join(dizin, 'ipa-apk.db')), `${dizin}/ipa-apk.db olusmadi`);
         return { detay: `${s.dosyalar().join(', ')}` };
       }, { dataDir: dizin });
     } finally {
