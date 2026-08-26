@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ipa Apk Application Manager">
+  <!-- Sekme simgesi: panelin marka isaretinin (elma + android) kare surumu.
+       Renkler SABIT: favicon sayfanin CSS degiskenlerini gormez, tarayici sekmesi
+       acik da koyu da olabilir — bu yuzden mavi zemin + beyaz simge. Zemin,
+       arayuzun accent rengiyle ayni (#0a66ff).
+       Iki simge ayni 24'luk kutudan olceklenip yan yana konumlandirildi. -->
+  <rect width="64" height="64" rx="14" fill="#0a66ff"/>
+  <g fill="#ffffff">
+    <g transform="translate(-3.6 12.8) scale(1.6)">
+      <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.79-3.33.79-.68 0-1.74-.77-2.87-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.75.73 1.06 1.6 2.24 2.74 2.2 1.1-.05 1.52-.71 2.85-.71s1.7.71 2.87.69c1.19-.02 1.94-1.07 2.66-2.13.84-1.22 1.19-2.4 1.2-2.46-.03-.01-2.3-.88-2.33-3.52zM14.9 5.9c.6-.73 1.01-1.75.9-2.76-.87.03-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.07 1.96-.49 2.57-1.22z"/>
+    </g>
+    <g transform="translate(25.7 11.2) scale(1.6)">
+      <path fill-rule="evenodd" d="M3.2 18.6a8.8 8.8 0 0 1 17.6 0v1H3.2zM7.7 13.8a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0zm6 0a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0z"/>
+      <path d="M6.9 11.4 4.6 6.4M17.1 11.4l2.3-5" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

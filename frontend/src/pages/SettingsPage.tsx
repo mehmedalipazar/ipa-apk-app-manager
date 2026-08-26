@@ -93,8 +93,6 @@ export function SettingsPage() {
       setKayitli(yanit.values);
       setWarnings(yanit.warnings);
       setNotes(yanit.notes);
-      // Site adi tarayici sekmesini de besler.
-      document.title = yanit.values.siteName || 'IPA OTA Dagitim';
       toast('Ayarlar kaydedildi');
     } catch (e) {
       if (e instanceof ApiError) {

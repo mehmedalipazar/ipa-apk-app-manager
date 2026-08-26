@@ -76,8 +76,19 @@ a { color: var(--accent); }
   backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 9px; font-weight: 650; letter-spacing: -0.02em; }
+/* Bir <a> oldugu icin varsayilan olarak alti cizili geliyordu; cizgi harflerin
+   altina giriyor ve uzun ad okunmuyordu. Renk vurgu mavisi olarak KALIR
+   (`a { color: var(--accent) }`), yalnizca alt cizgi kaldirilir. */
+.brand {
+  display: flex; align-items: center; gap: 9px; font-weight: 650; letter-spacing: -0.02em;
+  text-decoration: none;
+}
 .brand svg { display: block; }
+.brand.center { justify-content: center; }
+/* Iki platform simgesi ve aralarindaki ayrac. Aralik/yukseklik simge boyuna gore
+   BrandMark'ta hesaplanir; buradan yalnizca cizim gelir. */
+.brand-icons { display: inline-flex; align-items: center; }
+.brand-sep { width: 1px; background: var(--border); display: block; flex-shrink: 0; }
 .nav { display: flex; gap: 3px; margin-left: auto; align-items: center; }
 .nav a {
   padding: 7px 13px; border-radius: 9px; text-decoration: none;
@@ -383,6 +394,10 @@ a { color: var(--accent); }
 
 @media (max-width: 620px) {
   .topbar { padding: 0 15px; gap: 11px; }
+  /* Marka adi dar ekranda gizlenir, simge cifti kalir: olculen genislik
+     262 (marka) + 332 (nav) + aralik/padding = 635px, esik ise 620px —
+     yani ad birakilirsa ust cubuk telefonda tasiyor. */
+  .brand-name { display: none; }
   .nav a { padding: 7px 10px; font-size: 13px; }
   .main { padding: 22px 15px 60px; }
   .qr-panel { justify-content: center; }

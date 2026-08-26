@@ -117,7 +117,7 @@ export class ConfigService {
     return baseUrl;
   }
 
-  /** iOS OTA yalnizca gecerli sertifikali HTTPS uzerinden calisir. */
+  /** iOS OTA yalnizca gecerli sertifikali HTTPS ister; Android APK indirmesi de https bekler. */
   isBaseUrlSecure(): boolean {
     return this.cache.baseUrl.startsWith('https://');
   }
@@ -138,7 +138,9 @@ export class ConfigService {
       // teshisin yarisi. Panel bu diziyi oldugu gibi gosterir.
       out.push(
         `Genel adres (${this.cache.baseUrl}) https:// ile baslamiyor. iOS OTA kurulumu ` +
-          'yalnizca gecerli sertifikali HTTPS uzerinden calisir; bu link telefonda calismaz.',
+          'yalnizca gecerli sertifikali HTTPS uzerinden calisir; iOS linkleri telefonda ' +
+          'calismaz. Android tarafinda APK indirmesi guvensiz sayilip tarayici tarafindan ' +
+          'engellenebilir.',
       );
     }
     return out;

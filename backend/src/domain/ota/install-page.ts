@@ -108,6 +108,15 @@ ol li:last-child { margin-bottom: 0; }
 `;
 
 /**
+ * Sekme simgesi. Backend statik dosya SUNMAZ (kurulum sayfasi tek parca HTML'dir),
+ * bu yuzden panelin `frontend/public/favicon.svg` cizimi data URI olarak gomulu.
+ * `#` isareti data URI icinde parca ayraci sayildigi icin renkler %23 ile yazilir.
+ * Iki dosya elle esitlenir; ayni marka iki ayri serviste yasiyor.
+ */
+const FAVICON =
+  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230a66ff'/><g fill='%23ffffff'><g transform='translate(-3.6 12.8) scale(1.6)'><path d='M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.79-3.33.79-.68 0-1.74-.77-2.87-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.75.73 1.06 1.6 2.24 2.74 2.2 1.1-.05 1.52-.71 2.85-.71s1.7.71 2.87.69c1.19-.02 1.94-1.07 2.66-2.13.84-1.22 1.19-2.4 1.2-2.46-.03-.01-2.3-.88-2.33-3.52zM14.9 5.9c.6-.73 1.01-1.75.9-2.76-.87.03-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.07 1.96-.49 2.57-1.22z'/></g><g transform='translate(25.7 11.2) scale(1.6)'><path fill-rule='evenodd' d='M3.2 18.6a8.8 8.8 0 0 1 17.6 0v1H3.2zM7.7 13.8a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0zm6 0a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0z'/><path d='M6.9 11.4 4.6 6.4M17.1 11.4l2.3-5' fill='none' stroke='%23ffffff' stroke-width='1.7' stroke-linecap='round'/></g></g></svg>";
+
+/**
  * @param title  Sekmede gorunecek ad (uygulama + surum).
  * @param siteName  Varsa sekme basligina " · <site adi>" olarak eklenir.
  *   Ayarlardaki "Site adi" alani hem burayi hem de altbilgiyi besler.
@@ -120,6 +129,7 @@ function shell(title: string, body: string, siteName?: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
+<link rel="icon" href="${FAVICON}">
 <title>${escapeHtml(title)}${siteName ? ` &middot; ${escapeHtml(siteName)}` : ''}</title>
 <style>${STYLES}</style>
 </head>

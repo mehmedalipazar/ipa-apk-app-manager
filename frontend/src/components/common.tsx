@@ -47,6 +47,37 @@ export function StatusBadge({ status, label }: { status: BuildStatus; label: str
   );
 }
 
+/**
+ * Urun adi. Servis iki platform birden dagittigi icin ad da iki uzantiyi anar.
+ * Kurulum sayfasindaki "Site adi" AYRI bir ayardir (Ayarlar > Gorunum) ve
+ * bunu ezmez; burasi yalnizca panelin kendi markasidir.
+ */
+export const APP_NAME = 'Ipa Apk Application Manager';
+
+/**
+ * Marka isareti: iki platform simgesi, aralarinda ince bir ayrac. Servis hem
+ * .ipa hem .apk dagittigi icin logo tek platformu one cikarmaz.
+ *
+ * Iki olcu hesaplanarak veriliyor, sabit degil: android basi dogasi geregi
+ * elmadan genis ve basik oldugu icin biraz kucuk cizilir (yoksa yaninda blok
+ * gibi durur), ayrac ve aralik da simge boyuyla olceklenir.
+ *
+ * `withName` giris kartinda false: orada hemen altinda "Yonetici girisi"
+ * basligi var, marka yazisi onunla yarisiyor.
+ */
+export function BrandMark({ size = 19, withName = true }: { size?: number; withName?: boolean }) {
+  return (
+    <>
+      <span className="brand-icons" style={{ gap: Math.round(size * 0.4) }} aria-hidden="true">
+        <IconApple size={size} />
+        <span className="brand-sep" style={{ height: Math.round(size * 0.7) }} />
+        <IconAndroid size={Math.round(size * 0.9)} />
+      </span>
+      {withName && <span className="brand-name">{APP_NAME}</span>}
+    </>
+  );
+}
+
 /** Paketin platformu: iOS (.ipa) ya da Android (.apk). Renkler styles.css `.badge.platform`. */
 export function PlatformBadge({ platform }: { platform: Platform }) {
   return (

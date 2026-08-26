@@ -132,18 +132,22 @@ export const IconApple = ({ size = 22, className }: Props) => (
 /**
  * Android robot basi: yarim disk kafa, iki goz (evenodd ile delik) ve iki anten.
  * 12 px'te de okunsun diye geometri kaba tutuldu.
+ *
+ * Kutuyu dolduracak sekilde olceklendi: yan yana durdugu IconApple 24'luk
+ * kutuda ~18 birim yuksekliginde, robot basi ise dogasi geregi genis ve
+ * basiktir — kucuk cizilirse markanin yaninda sonradan eklenmis gibi durur.
  */
 export const IconAndroid = ({ size = 22, className }: Props) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path
       fillRule="evenodd"
-      d="M4.5 15.5a7.5 7.5 0 0 1 15 0v1h-15zM8 12a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0zm5.6 0a1.2 1.2 0 1 0 2.4 0 1.2 1.2 0 1 0-2.4 0z"
+      d="M3.2 18.6a8.8 8.8 0 0 1 17.6 0v1H3.2zM7.7 13.8a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0zm6 0a1.3 1.3 0 1 0 2.6 0 1.3 1.3 0 1 0-2.6 0z"
     />
     <path
-      d="M7.8 10 5.6 6.6M16.2 10l2.2-3.4"
+      d="M6.9 11.4 4.6 6.4M17.1 11.4l2.3-5"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="1.7"
       strokeLinecap="round"
     />
   </svg>

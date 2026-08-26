@@ -4,8 +4,8 @@ import { UploadPage } from './pages/UploadPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { BuildsPage } from './pages/BuildsPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
-import { Spinner } from './components/common.tsx';
-import { IconApple, IconBox, IconLogout, IconSettings, IconUpload } from './components/icons.tsx';
+import { BrandMark, Spinner } from './components/common.tsx';
+import { IconBox, IconLogout, IconSettings, IconUpload } from './components/icons.tsx';
 import { api, baglantiHatasiMetni, type SessionInfo } from './api.ts';
 
 export function App() {
@@ -35,19 +35,6 @@ export function App() {
   useEffect(() => {
     void oturumuTazele();
   }, [oturumuTazele]);
-
-  // "Site adi" ayari yalnizca kurulum sayfasini degil, yonetici sekmesini de
-  // besler. Ayarlar ucu oturum istedigi icin giristen sonra okunur; ayar
-  // panelden degistirildiginde SettingsPage basligi kendisi gunceller.
-  useEffect(() => {
-    if (!session?.authenticated) return;
-    void api
-      .getSettings()
-      .then((s) => {
-        if (s.values.siteName) document.title = s.values.siteName;
-      })
-      .catch(() => undefined);
-  }, [session?.authenticated]);
 
   const cikis = async () => {
     await api.logout().catch(() => undefined);
@@ -87,8 +74,7 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          <IconApple size={19} />
-          <span>IPA OTA</span>
+          <BrandMark size={19} />
         </Link>
 
         <nav className="nav">

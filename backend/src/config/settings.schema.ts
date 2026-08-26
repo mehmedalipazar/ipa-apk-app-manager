@@ -44,7 +44,7 @@ export const AppConfigSchema = z.object({
   purgeAfterExpiryHours: z.number().int().min(0).max(MAX_TTL_HOURS).default(24),
 
   /** Kurulum sayfasinda gosterilen baslik. */
-  siteName: z.string().trim().max(80).default('IPA OTA Dagitim'),
+  siteName: z.string().trim().max(80).default('Ipa Apk Application Manager'),
 
   /** Kurulum sayfasinin altinda gosterilen serbest metin. */
   installNote: z.string().trim().max(500).default(''),
@@ -99,7 +99,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'siteName',
     label: 'Site adi',
-    help: 'Kurulum sayfasinin altbilgisinde ve tarayici sekmesinde gorunur.',
+    help: 'Kurulum sayfasinin altbilgisinde ve o sayfanin tarayici sekmesinde gorunur. Yonetici panelinin basligini degistirmez.',
     kind: 'text',
     group: 'gorunum',
   },
@@ -113,7 +113,7 @@ export const CONFIG_FIELDS: readonly FieldMeta[] = [
   {
     key: 'showQrCode',
     label: 'QR kod goster',
-    help: 'Yukleme sonuc ekraninda ve kurulum sayfasi iOS DISI bir cihazda acildiginda QR kod gosterilir. iPhone/iPad ile girildiginde QR yerine dogrudan kurulum butonu cikar.',
+    help: 'Yukleme sonuc ekraninda ve kurulum sayfasi paketin platformu DISINDA bir cihazda acildiginda QR kod gosterilir. iPhone/iPad ile bir iOS linki, Android cihazla bir APK linki acildiginda QR yerine dogrudan kurulum/indirme butonu cikar.',
     kind: 'boolean',
     group: 'gorunum',
   },

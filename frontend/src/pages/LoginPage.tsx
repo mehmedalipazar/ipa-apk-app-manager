@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Alert, Spinner } from '../components/common.tsx';
-import { IconApple } from '../components/icons.tsx';
+import { Alert, BrandMark, Spinner } from '../components/common.tsx';
 import { ApiError, api, baglantiHatasiMetni, baglantiHatasiMi } from '../api.ts';
 
 /**
@@ -62,8 +61,10 @@ export function LoginPage({
     <div className="center-screen">
       <div className="login-card">
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <IconApple size={34} />
-          <h1 style={{ marginTop: 9 }}>Yonetici girisi</h1>
+          <div className="brand center">
+            <BrandMark size={32} withName={false} />
+          </div>
+          <h1 style={{ marginTop: 11 }}>Yonetici girisi</h1>
           <p style={{ color: 'var(--fg-muted)', marginTop: 5 }}>
             Surumleri ve ayarlari yonetmek icin giris yapin.
           </p>
