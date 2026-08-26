@@ -38,7 +38,7 @@ const PatchSchema = z.object({
   /** Sure neyin uzerine eklensin: yukleme ani mi, su an mi? */
   ttlFrom: z.enum(['upload', 'now']).optional(),
   revoked: z.boolean().optional(),
-  note: z.string().max(500).nullable().optional(),
+  note: z.string().max(1000).nullable().optional(),
   /** null gonderilirse sifre korumasi kaldirilir. */
   password: z.string().nullable().optional(),
 });

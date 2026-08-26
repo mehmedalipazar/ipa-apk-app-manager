@@ -10,6 +10,7 @@ import {
   AlertList,
   AppIcon,
   CopyButton,
+  NotAlani,
   PlatformBadge,
   Spinner,
 } from '../components/common.tsx';
@@ -313,18 +314,9 @@ export function UploadPage() {
                   )}
                 </div>
 
-                <div className="field">
-                  <label htmlFor="not">Not (opsiyonel)</label>
-                  <div className="help">Yalnizca yonetici panelinde gorunur.</div>
-                  <input
-                    id="not"
-                    className="input"
-                    value={not}
-                    maxLength={500}
-                    placeholder="orn. Musteri demo surumu"
-                    onChange={(e) => setNot(e.target.value)}
-                  />
-                </div>
+                {/* Dosya degistirilince ya da yukleme bitince bu blok tumden
+                    kalkar; NotAlani'nin acik/kapali durumu da onunla sifirlanir. */}
+                <NotAlani id="not" deger={not} onDegis={setNot} />
 
                 <div className="field">
                   <label htmlFor="sifre">Link sifresi (opsiyonel)</label>

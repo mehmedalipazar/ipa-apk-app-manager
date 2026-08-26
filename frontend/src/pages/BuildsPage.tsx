@@ -10,6 +10,8 @@ import {
   AppIcon,
   CopyButton,
   EmptyState,
+  NotAlani,
+  NotPenceresi,
   PlatformBadge,
   Spinner,
   StatusBadge,
@@ -20,6 +22,7 @@ import {
   IconDownload,
   IconEye,
   IconLock,
+  IconNote,
   IconQr,
   IconSettings,
   IconTrash,
@@ -57,6 +60,8 @@ export function BuildsPage() {
   > | null>(null);
   /** QR'i acik olan surum. Liste kalabaliklasmasin diye tek seferde bir tane. */
   const [qrAcik, setQrAcik] = useState<string | null>(null);
+  /** Notu acik olan surum — QR ile ayni kural: ayni anda tek kart. */
+  const [notAcik, setNotAcik] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState<string | null>(null);
   const [arama, setArama] = useState('');
@@ -142,6 +147,9 @@ export function BuildsPage() {
       suresiDolmus ? `Link yeniden acildi (${formatHours(build.ttlHours)})` : 'Link yeniden acildi',
     );
   };
+
+  /** Penceresi acik olan surum; silinir/filtrelenirse pencere kendiliginden kapanir. */
+  const notluSurum = notAcik ? items.find((b) => b.id === notAcik) : undefined;
 
   return (
     <div className="main">
@@ -229,12 +237,6 @@ export function BuildsPage() {
                     {build.bundleId} &middot; {build.sizeLabel} &middot; {formatDateTime(build.createdAt)}
                   </div>
 
-                  {build.note && (
-                    <div className="build-sub" style={{ fontStyle: 'italic' }}>
-                      {build.note}
-                    </div>
-                  )}
-
                   <div className="build-stats">
                     <span title={`Verilen sure: ${formatHours(build.ttlHours)} — bitis ${formatDateTime(build.expiresAt)}`}>
                       <IconClock size={13} />
@@ -294,6 +296,17 @@ export function BuildsPage() {
                     <IconQr size={14} /> {qrAcik === build.id ? 'QR kodu gizle' : 'QR kod'}
                   </button>
                 )}
+                {/* Pencereyi acar. Etiket sabittir: pencere acikken buton zaten
+                    katmanin altinda kalir, kapatma pencerenin kendi isidir. */}
+                {build.note && (
+                  <button
+                    className="btn secondary sm"
+                    aria-haspopup="dialog"
+                    onClick={() => setNotAcik(build.id)}
+                  >
+                    <IconNote size={14} /> Not
+                  </button>
+                )}
                 <button
                   className="btn secondary sm"
                   disabled={islemdeki === build.id || build.status === 'purged'}
@@ -334,6 +347,14 @@ export function BuildsPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {notluSurum?.note && (
+        <NotPenceresi
+          baslik={notluSurum.appName}
+          not={notluSurum.note}
+          onKapat={() => setNotAcik(null)}
+        />
       )}
     </div>
   );
@@ -451,18 +472,14 @@ function LinkAyarlari({ build, maxTtl, mesgul, onKaydet, onVazgec }: AyarProps) 
         </div>
       </div>
 
-      <div className="field">
-        <label htmlFor={`not-${build.id}`}>Not</label>
-        <div className="help">Yalnizca yonetici panelinde gorunur.</div>
-        <input
-          id={`not-${build.id}`}
-          className="input"
-          value={not}
-          maxLength={500}
-          placeholder="orn. Musteri demo surumu"
-          onChange={(e) => setNot(e.target.value)}
-        />
-      </div>
+      {/* Kayitli bir not varsa panel acik baslar: duzenlemeye gelen kisi onu
+          gormek istiyordur. Bos notta kapali durur, buton yine oradadir. */}
+      <NotAlani
+        id={`not-${build.id}`}
+        deger={not}
+        onDegis={setNot}
+        acikBasla={(build.note ?? '') !== ''}
+      />
 
       <div className="field">
         <label htmlFor={`sifre-${build.id}`}>Link sifresi</label>

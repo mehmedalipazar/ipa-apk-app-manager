@@ -44,7 +44,7 @@ export const AppConfigSchema = z.object({
   purgeAfterExpiryHours: z.number().int().min(0).max(MAX_TTL_HOURS).default(24),
 
   /** Kurulum sayfasinda gosterilen baslik. */
-  siteName: z.string().trim().max(80).default('Ipa Apk Application Manager'),
+  siteName: z.string().trim().max(80).default('Ipa / Apk Application Manager'),
 
   /** Kurulum sayfasinin altinda gosterilen serbest metin. */
   installNote: z.string().trim().max(500).default(''),

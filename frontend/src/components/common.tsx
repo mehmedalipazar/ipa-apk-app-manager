@@ -1,8 +1,17 @@
 /** Ekranlar arasinda paylasilan kucuk parcalar. */
-import { useState, type ReactNode } from 'react';
-import { IconAndroid, IconApple, IconCheck, IconCopy, IconWarn } from './icons.tsx';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  IconAndroid,
+  IconApple,
+  IconCheck,
+  IconChevron,
+  IconClose,
+  IconCopy,
+  IconNote,
+  IconWarn,
+} from './icons.tsx';
 import { useToast } from './Toast.tsx';
-import type { BuildStatus, Platform } from '../api.ts';
+import { NOT_MAX_KARAKTER, type BuildStatus, type Platform } from '../api.ts';
 
 export function Alert({
   kind,
@@ -52,7 +61,7 @@ export function StatusBadge({ status, label }: { status: BuildStatus; label: str
  * Kurulum sayfasindaki "Site adi" AYRI bir ayardir (Ayarlar > Gorunum) ve
  * bunu ezmez; burasi yalnizca panelin kendi markasidir.
  */
-export const APP_NAME = 'Ipa Apk Application Manager';
+export const APP_NAME = 'Ipa / Apk Application Manager';
 
 /**
  * Marka isareti: iki platform simgesi, aralarinda ince bir ayrac. Servis hem
@@ -152,6 +161,155 @@ export function AppIcon({
 
 export function Spinner() {
   return <span className="spinner" />;
+}
+
+/**
+ * Not alanlarinin karakter sayaci.
+ *
+ * Sinira dayanan kullanici, yazdiginin sessizce kesildigini sanmasin diye son
+ * %10'luk dilimde uyari rengine doner. Kesme isini sayac degil girdinin
+ * `maxLength`i yapar; burasi yalnizca gorunur geri bildirim.
+ */
+export function KarakterSayaci({
+  uzunluk,
+  sinir = NOT_MAX_KARAKTER,
+}: {
+  uzunluk: number;
+  sinir?: number;
+}) {
+  const yakin = uzunluk >= sinir - Math.round(sinir / 10);
+  return (
+    <span className={`char-count ${yakin ? 'near' : ''}`} aria-live="polite">
+      {uzunluk} / {sinir} karakter
+    </span>
+  );
+}
+
+/**
+ * Not penceresi — surum kartindaki "Not" butonunun actigi salt okunur pencere.
+ *
+ * Kart icinde acilan bir panel altindaki her seyi asagi itiyor, uzun listede
+ * okunan satirin yerini kaybettiriyordu. Pencere hicbir seyi oynatmaz ve 1000
+ * karakterlik nota da yer birakir (tasarsa kendi icinde kayar).
+ * Esc, capraz ve arka plan tiklamasi kapatir.
+ */
+export function NotPenceresi({
+  baslik,
+  not,
+  onKapat,
+}: {
+  baslik: string;
+  not: string;
+  onKapat: () => void;
+}) {
+  const dugmeRef = useRef<HTMLButtonElement>(null);
+  // Esc dinleyicisi yalnizca ACILISTA kurulur; onKapat her render'da yeni bir
+  // fonksiyon oldugu icin dogrudan bagimlilik yapilirsa odak surekli calinir.
+  const sonKapat = useRef(onKapat);
+  useEffect(() => {
+    sonKapat.current = onKapat;
+  });
+  useEffect(() => {
+    dugmeRef.current?.focus();
+    const tus = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') sonKapat.current();
+    };
+    window.addEventListener('keydown', tus);
+    return () => window.removeEventListener('keydown', tus);
+  }, []);
+
+  return (
+    <div className="modal-katman" onClick={() => onKapat()}>
+      {/* Pencerenin kendisine tiklamak kapatmamali. */}
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="not-penceresi-baslik"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <IconNote size={16} />
+          <strong id="not-penceresi-baslik">Not &mdash; {baslik}</strong>
+          <button ref={dugmeRef} className="btn ghost sm" aria-label="Kapat" onClick={() => onKapat()}>
+            <IconClose size={14} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <p className="not-metni">{not}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface NotAlaniProps {
+  /** Metin kutusunun id'si — ayni sayfada birden fazla ornek olabilir. */
+  id: string;
+  deger: string;
+  onDegis: (yeni: string) => void;
+  /** Panel acik baslasin mi (orn. duzenlemede kayitli bir not zaten varsa). */
+  acikBasla?: boolean;
+  sinir?: number;
+}
+
+/**
+ * Not alani — butona bagli, acilip kapanan cok satirli panel.
+ *
+ * Not ikincil bir alandir: surekli acik dursa formu uzatir, tumden gizlense
+ * unutulur. Bu yuzden kapali baslar ama KAPALIYKEN DE icerigi baslik satirinda
+ * ozetlenir; gonderilecek ya da kaydedilecek bir sey hicbir zaman gorunmez
+ * olmaz. Yukleme ve Surumler ekranlari ayni bileseni kullanir — iki yerde ayni
+ * sinir, ayni sayac, ayni davranis.
+ */
+export function NotAlani({ id, deger, onDegis, acikBasla = false, sinir = NOT_MAX_KARAKTER }: NotAlaniProps) {
+  const [acik, setAcik] = useState(acikBasla);
+  // Cok satirli notun ozeti tek satira sigmali: satir sonlari bosluga doner.
+  const ozet = deger.trim().replace(/\s+/g, ' ');
+
+  return (
+    <div className={`field disclosure ${acik ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="disclosure-btn"
+        aria-expanded={acik}
+        aria-controls={`${id}-govde`}
+        onClick={() => setAcik((a) => !a)}
+      >
+        <IconNote size={16} className="dc-icon" />
+        <span>{ozet ? 'Not' : 'Not ekle (opsiyonel)'}</span>
+        <span className="dc-summary">{acik ? '' : ozet}</span>
+        <IconChevron size={16} className="dc-arrow" />
+      </button>
+
+      {acik && (
+        <div className="disclosure-body" id={`${id}-govde`}>
+          <div className="help">
+            Yalnizca yonetici panelinde gorunur; kurulum sayfasinda yer almaz. En fazla {sinir}{' '}
+            karakter, satir sonu kullanabilirsiniz.
+          </div>
+          <textarea
+            id={id}
+            className="textarea"
+            value={deger}
+            maxLength={sinir}
+            placeholder={'orn. Musteri demo surumu — 26 Agustos sunumu icin.\nBilinen eksik: cevrimdisi mod kapali.'}
+            aria-label="Not"
+            autoFocus
+            onChange={(e) => onDegis(e.target.value)}
+          />
+          <div className="disclosure-foot">
+            {deger !== '' && (
+              <button type="button" className="btn ghost sm" onClick={() => onDegis('')}>
+                Temizle
+              </button>
+            )}
+            <KarakterSayaci uzunluk={deger.length} sinir={sinir} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {

@@ -119,6 +119,19 @@ export interface CleanupPreview {
   bytes: number;
 }
 
+/**
+ * Not alaninin karakter siniri.
+ *
+ * Sunucu tarafindaki karsiligi `backend/src/modules/builds/builds.module.ts`
+ * icindeki `note: z.string().max(1000)` — DTO adlari gibi bu da ELLE ayni
+ * tutulur, derleyici uyusmazligi yakalamaz. Degistirirken iki yeri birden
+ * degistirin, yoksa panel sunucunun reddedecegi bir degeri gonderir.
+ *
+ * Ayarlardaki `installNote` ile karistirilmamali: o, kurulum sayfasinda HERKESE
+ * gorunen metindir ve kendi 500 karakterlik sinirina sahiptir.
+ */
+export const NOT_MAX_KARAKTER = 1000;
+
 /** Sure degistirilirken hangi anin uzerine eklenecegi. */
 export type TtlBasis = 'upload' | 'now';
 

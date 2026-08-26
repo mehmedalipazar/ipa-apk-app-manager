@@ -123,6 +123,29 @@ export const IconLogout = ({ size = 16, className }: Props) => (
   </svg>
 );
 
+export const IconClose = ({ size = 16, className }: Props) => (
+  <svg {...base(size)} className={className}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+
+export const IconNote = ({ size = 16, className }: Props) => (
+  <svg {...base(size)} className={className}>
+    <rect width="16" height="18" x="4" y="3" rx="2" />
+    <path d="M8 8h8" />
+    <path d="M8 12h8" />
+    <path d="M8 16h4" />
+  </svg>
+);
+
+/** Acilir-kapanir alanlarin oku; kapali durumda asagi bakar, acikken CSS ile donderilir. */
+export const IconChevron = ({ size = 16, className }: Props) => (
+  <svg {...base(size)} className={className}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
 export const IconApple = ({ size = 22, className }: Props) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
     <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.79-3.33.79-.68 0-1.74-.77-2.87-.75-1.47.02-2.83.86-3.59 2.17-1.53 2.66-.39 6.6 1.1 8.75.73 1.06 1.6 2.24 2.74 2.2 1.1-.05 1.52-.71 2.85-.71s1.7.71 2.87.69c1.19-.02 1.94-1.07 2.66-2.13.84-1.22 1.19-2.4 1.2-2.46-.03-.01-2.3-.88-2.33-3.52zM14.9 5.9c.6-.73 1.01-1.75.9-2.76-.87.03-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.07 1.96-.49 2.57-1.22z" />
