@@ -1,4 +1,4 @@
-# ipa-ota-download
+# ipa-apk-app-manager
 
 Kendi sunucunuzda çalışan iOS **ve Android** **OTA (over-the-air)** dağıtım servisi. IPA ya da
 APK'yı panelden yükleyin, süreli bir kurulum linki alın; alıcı linki telefonunda mobil
@@ -44,7 +44,7 @@ kalkar:
 | derleme ayarı | `backend/tsconfig.json` (kendi kendine yeter) | `frontend/tsconfig.json` |
 | compose sırları | `backend/.env` | `frontend/.env` |
 | uygulama ayarı | `.env.development` / `.env.production` / `.env.local` (Node) | `.env.development` / `.env.production` / `.env.development.local` (Vite; `.env.local` mode dosyasını **ezemez**) |
-| yayın | `backend/docker-compose.yml` → proje `ipa-ota-backend` | `frontend/docker-compose.yml` → proje `ipa-ota-frontend` |
+| yayın | `backend/docker-compose.yml` → proje `ipa-apk-backend` | `frontend/docker-compose.yml` → proje `ipa-apk-frontend` |
 | veri | `backend/data-docker/` | yok (durum tutmaz) |
 
 Aralarında container-içi trafik, ortak ağ veya paylaşılan dosya yoktur. **Tek bağ HTTP'dir**
@@ -95,7 +95,7 @@ kendi `.env`'i içinde `WEB_PORT` / `API_PORT` ile değişir; container-içi por
   `.env.[mode]` → `.env.[mode].local`) — bu yüzden **`frontend/.env`'e `VITE_` önekli
   bir değişken yazmayın**, sessizce derlemeye sızar; makineye özel ezme
   `.env.development.local`'a yazılır (`.env.local` mode dosyasını ezemez).
-- Compose proje adları dosyalarda sabitlenmiştir (`ipa-ota-backend`, `ipa-ota-frontend`).
+- Compose proje adları dosyalarda sabitlenmiştir (`ipa-apk-backend`, `ipa-apk-frontend`).
   Aksi halde compose dizin adını (`backend`, `frontend`) kullanır ve iki servis karışır.
 
 ### Ters proxy (yayına alma)
@@ -159,7 +159,7 @@ verisi yoktur:
 ```bash
 cd backend
 docker compose stop api
-tar czf ipa-ota-yedek-$(date +%F).tar.gz data-docker/
+tar czf ipa-apk-yedek-$(date +%F).tar.gz data-docker/
 docker compose start api
 ```
 
@@ -409,7 +409,7 @@ Gruplar aynı ölçüde izole **değildir** — koşmadan önce bilin:
 | Grup | Ne yapar | Neye dokunur |
 |---|---|---|
 | A | Her senaryo için ayrı bir backend süreci (geçici `DATA_DIR`, boş port; hiçbir `.env` okunmaz) | Hiçbir şeye |
-| B | Sunucu başlatmaz: çalışan backend compose yığınına `docker compose config/exec` (`backend/` dizininden) + `ipa-ota-vartest` adlı geçici compose projesi (:38080) | Yığın kapalıysa ilgili adımlar atlanır; geçici proje sonda silinir |
+| B | Sunucu başlatmaz: çalışan backend compose yığınına `docker compose config/exec` (`backend/` dizininden) + `ipa-apk-vartest` adlı geçici compose projesi (:38080) | Yığın kapalıysa ilgili adımlar atlanır; geçici proje sonda silinir |
 | C | C1/C2/C3/C5/C16 **canlı** `--taban` adresine gider (varsayılan `http://localhost:3000` — bu makinede üretim api container'ı; ayakta olmalı). C3b web container'ını (`frontend/.env` `WEB_PORT`) yoklar. D/F/G/H/I blokları izole sunucuda | Canlı bloğu yalnızca okur |
 | D | `suite-d-https.mjs`: yayındaki HTTPS zincirini hedefler. `backend/.env`'den `PUBLIC_BASE_URL`, `INSTALL_PATH_PREFIX`, `ADMIN_PASSWORD` okur, **canlı panele gerçek şifreyle girer**, üç geçici sürüm yükler (D5.1, D9.2, D10.1), birini iptal eder (D9.4), sonunda hepsini siler (D12.1) | **Üretim verisi** — koşum yarıda kesilirse artık sürümleri panelden silin |
 
@@ -418,7 +418,7 @@ Gruplar aynı ölçüde izole **değildir** — koşmadan önce bilin:
 > yerde kırıktı (C3b kök `.env`, F13/F14 kök `node_modules`'daki `better-sqlite3`, F20 kök
 > `package.json`). İnceleyerek doğrulama kaçırmıştı, koşum saniyeler içinde yakaladı: **testler
 > hakkındaki iddialar koşumdan gelir.** Bugün tüm betikler `backend/.env`,
-> `backend/docker-compose.yml` (proje `ipa-ota-backend`) ve `frontend/.env` / `frontend/` kullanır.
+> `backend/docker-compose.yml` (proje `ipa-apk-backend`) ve `frontend/.env` / `frontend/` kullanır.
 
 Son tam yeşil koşum: **193/193** (26 Ağustos 2026, APK desteği; A 30 + C 100
 `tests/reports/rapor-2026-08-26T08-28-38-829Z.json`, B 14 `…T08-27-51-364Z`, D 49

@@ -1,5 +1,5 @@
 # =============================================================================
-#  ipa-ota-download / FRONTEND — bagimsiz servis
+#  ipa-apk-app-manager / FRONTEND — bagimsiz servis
 #
 #      cd frontend
 #      cp .env.example .env        # host portu (istege bagli)
@@ -24,7 +24,7 @@
 
 # Proje adi acikca sabitlenir. Aksi halde compose dizin adini ("frontend")
 # kullanir ve backend tarafiyla karisir.
-name: ipa-ota-frontend
+name: ipa-apk-frontend
 
 services:
   web:
@@ -33,8 +33,8 @@ services:
       # package-lock.json dosyasina sahiptir; npm workspaces kaldirildi.
       context: .
       dockerfile: Dockerfile
-    image: ipa-ota-web:latest
-    container_name: ipa-ota-web
+    image: ipa-apk-web:latest
+    container_name: ipa-apk-web
     restart: unless-stopped
     # Bu servisin CALISMA ZAMANI ortam degiskeni YOKTUR: API adresi derleme
     # zamaninda paketlenir (bkz. .env.production). Eski calisma zamani

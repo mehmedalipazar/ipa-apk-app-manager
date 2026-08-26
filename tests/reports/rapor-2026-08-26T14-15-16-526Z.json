@@ -1,0 +1,104 @@
+{
+  "tarih": "2026-08-26T14:15:16.527Z",
+  "taban": "http://localhost:3000",
+  "sonuclar": [
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B1",
+      "baslik": "${VAR} ifadeleri host .env dosyasindan cozuluyor",
+      "gecti": true,
+      "detay": "PUBLIC_BASE_URL=https://ipa-ios.simurgbilisim.com yerine gecmis"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B2",
+      "baslik": "${LOG_LEVEL:-info} varsayilani uygulaniyor",
+      "gecti": true,
+      "detay": "LOG_LEVEL=info, TRUST_PROXY=true, ADMIN_PASSWORD_FORCE_RESET=false"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B3",
+      "baslik": "ADMIN_PASSWORD bos birakilirsa compose BASLAMIYOR",
+      "gecti": true,
+      "detay": "compose durdu (kod 15), mesajda degisken adi var"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B4",
+      "baslik": "Calisan container, host .env dosyasi ile senkron mu (drift tespiti)",
+      "gecti": true,
+      "detay": "3 degisken esit"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B5",
+      "baslik": "NODE_ENV/PORT/DATA_DIR backend/.env den container a SIZMIYOR",
+      "gecti": true,
+      "detay": "uc degisken de container a gecmiyor — kaynak .env.production"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B9",
+      "baslik": "api ve web portlari host a yayinlaniyor (ports mapping var)",
+      "gecti": true,
+      "detay": "api: 0.0.0.0:3000->3000/tcp | web: 0.0.0.0:5173->8080/tcp"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B10",
+      "baslik": "Host portlarindan /healthz 200 donuyor (api + web)",
+      "gecti": true,
+      "detay": "api:3000 ve web:5173 -> 200"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B13",
+      "baslik": "web imajinda calisma zamani yapilandirmasi YOK (goreli yol)",
+      "gecti": true,
+      "detay": "config.js yok, acilis betigi yok, paket goreli yol kullaniyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B12",
+      "baslik": "Healthcheck PORT degiskenini okuyor (container healthy)",
+      "gecti": true,
+      "detay": "health=healthy"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B7",
+      "baslik": ".env degisikligi `up -d` sonrasi container a yansiyor",
+      "gecti": true,
+      "detay": "env degiskeni container a ulasti"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8",
+      "baslik": "Panelden HIC kaydedilmemisken PUBLIC_BASE_URL her aciliste yeniden okunuyor",
+      "gecti": true,
+      "detay": "ilk kayittan once env canli; kayittan sonra DB kilitler (B8b)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B8b",
+      "baslik": "Panelden kaydetmek PUBLIC_BASE_URL i GOLGELEYEMIYOR",
+      "gecti": true,
+      "detay": "panelden kayit adres ayarini golgelemiyor"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B6",
+      "baslik": ".env degisikligi yeniden olusturma OLMADAN etkisiz",
+      "gecti": true,
+      "detay": ".env=ucuncu ama container=https://dorduncu.vartest (beklenen)"
+    },
+    {
+      "grup": "B — Docker Compose degisken aktarimi",
+      "id": "B11",
+      "baslik": "Volume kaliciligi: down → up sonrasi DB korunuyor",
+      "gecti": true,
+      "detay": "SQLite korundu (siteName), baseUrl env den tazelendi"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
  * B grubu — Docker Compose degisken aktarimi.
  *
  * Salt-okunur testler mevcut yigina karsi calisir (`docker compose config`,
- * `docker exec`). Yeniden baslatma gerektiren testler `ipa-ota-vartest` adli
+ * `docker exec`). Yeniden baslatma gerektiren testler `ipa-apk-vartest` adli
  * IZOLE bir projede, mevcut imaji yeniden kullanarak calisir; sonunda temizlenir.
  *
  * 2026-08-13 ayrimindan beri IKI compose projesi var: backend/ (api + dbadmin)
@@ -15,8 +15,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { grup, test, bekle, esit, uyu, KOK } from './lib/harness.mjs';
 
-const TEST_PROJE = 'ipa-ota-vartest';
-const IMAJ = 'ipa-ota-api:latest';
+const TEST_PROJE = 'ipa-apk-vartest';
+const IMAJ = 'ipa-apk-api:latest';
 
 // Varsayilan calisma dizini backend/ — compose dosyasi ve .env orada.
 function kabuk(komut, secenekler = {}) {
@@ -257,7 +257,7 @@ export async function calistir() {
   });
 
   /* B6/B7/B8/B11 — izole projede yeniden baslatma dongusu */
-  const geciciDizin = mkdtempSync(join(tmpdir(), 'ipa-ota-compose-'));
+  const geciciDizin = mkdtempSync(join(tmpdir(), 'ipa-apk-compose-'));
   const envDosya = join(geciciDizin, '.env');
   const composeDosya = join(geciciDizin, 'docker-compose.yml');
 

@@ -1,11 +1,11 @@
 # =============================================================================
-#  ipa-ota-download — FRONTEND imaji (nginx + statik SPA)
+#  ipa-apk-app-manager — FRONTEND imaji (nginx + statik SPA)
 #
 #  Yalnizca admin arayuzunu sunar. API AYRI BIR SERVISTIR (../backend) ve bu
 #  imajin ondan hicbir haberi yoktur — ne derlemede ne calismada.
 #
 #  DERLEME BAGLAMI BU DIZINDIR — depo koku DEGIL:
-#      cd frontend && docker build -t ipa-ota-web:latest .
+#      cd frontend && docker build -t ipa-apk-web:latest .
 #      cd frontend && docker compose up -d --build
 #
 #  npm workspaces KALDIRILDI: frontend'in kendi package.json + package-lock.json

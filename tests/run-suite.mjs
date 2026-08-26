@@ -9,7 +9,7 @@
  * Hangi grup neyi hedefler (esit olcude izole DEGILLER):
  *   A — her senaryo icin izole backend process'i (gecici DATA_DIR, bos port; .env okunmaz)
  *   B — sunucu baslatmaz: calisan backend compose yigini (`docker compose config/exec`,
- *       backend/ dizininden) + `ipa-ota-vartest` adli gecici compose projesi (:38080)
+ *       backend/ dizininden) + `ipa-apk-vartest` adli gecici compose projesi (:38080)
  *   C — C1/C2/C3/C5/C16 CANLI `--taban` ornegine gider (varsayilan http://localhost:3000;
  *       bu Mac'te o adres URETIM api container'idir, ayakta olmali). C3b web container'ini
  *       (frontend/.env WEB_PORT, varsayilan 5173) yoklar. D/F/G/H bloklari izole sunucu.
@@ -40,7 +40,7 @@ const suitler = [
   ['D', './suite-d-https.mjs'],
 ];
 
-console.log(`\x1b[1mipa-ota-download — uctan uca test\x1b[0m`);
+console.log(`\x1b[1mipa-apk-app-manager — uctan uca test\x1b[0m`);
 console.log(`  Canli hedef : ${TABAN}`);
 console.log(`  Gruplar     : ${secilen.length ? secilen.join(', ') : 'hepsi'}`);
 

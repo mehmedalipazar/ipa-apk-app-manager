@@ -1,4 +1,4 @@
-# ipa-ota-download — Uctan Uca Test Senaryolari
+# ipa-apk-app-manager — Uctan Uca Test Senaryolari
 
 Kapsam: ortam degiskeni (env) okuma zinciri, docker compose degisken aktarimi,
 backend↔frontend haberlesme sozlesmesi, admin ayarlar panelinin her alani ve

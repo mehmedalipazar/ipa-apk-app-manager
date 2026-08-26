@@ -1,5 +1,5 @@
 {
-  "name": "ipa-ota-backend",
+  "name": "ipa-apk-backend",
   "version": "2.0.0",
   "private": true,
   "type": "module",

@@ -1,5 +1,5 @@
 # =============================================================================
-#  ipa-ota-download / BACKEND — bagimsiz servis
+#  ipa-apk-app-manager / BACKEND — bagimsiz servis
 #
 #      cd backend
 #      cp .env.example .env        # sirlari doldurun
@@ -27,7 +27,7 @@
 
 # Proje adi acikca sabitlenir. Aksi halde compose dizin adini ("backend")
 # kullanir ve frontend tarafiyla karisir.
-name: ipa-ota-backend
+name: ipa-apk-backend
 
 services:
   api:
@@ -36,8 +36,8 @@ services:
       # package-lock.json dosyasina sahiptir; npm workspaces kaldirildi.
       context: .
       dockerfile: Dockerfile
-    image: ipa-ota-api:latest
-    container_name: ipa-ota-api
+    image: ipa-apk-api:latest
+    container_name: ipa-apk-api
     restart: unless-stopped
     environment:
       # --- Sirlar (bu dizindeki .env dosyasindan) ---
@@ -118,7 +118,7 @@ services:
     # Yonetim araci oldugu icin yavasligi onemsiz, ama acikca belirtiyoruz ki
     # compose her seferinde platform uyarisi basmasin.
     platform: linux/amd64
-    container_name: ipa-ota-dbadmin
+    container_name: ipa-apk-dbadmin
     restart: unless-stopped
     environment:
       # -P bayragi sifreyi bu degiskenden okur; tanimsizsa compose durur.

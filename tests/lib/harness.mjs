@@ -198,7 +198,7 @@ export function apkAdresiCikar(html) {
  */
 export async function sunucuBaslat(env = {}, secenekler = {}) {
   const port = env.PORT ?? (await bosPort());
-  const veriDizini = secenekler.dataDir ?? mkdtempSync(join(tmpdir(), 'ipa-ota-test-'));
+  const veriDizini = secenekler.dataDir ?? mkdtempSync(join(tmpdir(), 'ipa-apk-test-'));
 
   const cocuk = spawn(
     process.execPath,
@@ -288,7 +288,7 @@ export async function sunucuIle(env, fn, secenekler = {}) {
 
 /** Ayni DATA_DIR ile yeniden baslatma senaryolari icin. */
 export function geciciDizin() {
-  return mkdtempSync(join(tmpdir(), 'ipa-ota-test-'));
+  return mkdtempSync(join(tmpdir(), 'ipa-apk-test-'));
 }
 
 export function dizinSil(d) {

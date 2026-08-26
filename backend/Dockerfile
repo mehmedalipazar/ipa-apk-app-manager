@@ -1,11 +1,11 @@
 # =============================================================================
-#  ipa-ota-download — BACKEND imaji (Fastify)
+#  ipa-apk-app-manager — BACKEND imaji (Fastify)
 #
 #  Yalnizca API (/api/*) ve OTA kurulum uclarini sunar. Admin arayuzu AYRI BIR
 #  SERVISTIR (../frontend), aralarinda container-ici trafik yoktur.
 #
 #  DERLEME BAGLAMI BU DIZINDIR — depo koku DEGIL:
-#      cd backend && docker build -t ipa-ota-api:latest .
+#      cd backend && docker build -t ipa-apk-api:latest .
 #      cd backend && docker compose up -d --build
 #
 #  npm workspaces KALDIRILDI: backend'in kendi package.json + package-lock.json

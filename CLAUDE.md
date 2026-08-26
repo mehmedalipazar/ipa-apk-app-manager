@@ -74,7 +74,7 @@ otherwise).
   `http://localhost:3000` — on this Mac that is the production api container, so it must be up
   (`--taban http://localhost:3010` to point it at a dev backend; never 5173, that is nginx); and
   group B spawns no server at all — it drives `docker compose config`/`exec` against the running
-  backend stack plus a throwaway compose project `ipa-ota-vartest` on port 38080.
+  backend stack plus a throwaway compose project `ipa-apk-vartest` on port 38080.
 - Group B additionally exercises the running `docker compose` stack; bring it up first or those
   cases skip.
 - Group D targets the real deployed HTTPS chain. `suite-d-https.mjs` reads `PUBLIC_BASE_URL`,
@@ -114,7 +114,7 @@ otherwise).
 > `node_modules`, F20 uploaded the deleted root `package.json` as its wrong-extension fixture).
 > The inspection-only verification missed what a run caught in seconds: **claims about tests must
 > come from running them.** All suites now use `backend/.env`, `backend/docker-compose.yml`
-> (project `ipa-ota-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
+> (project `ipa-apk-backend`, run from `backend/`) and `frontend/.env` / `frontend/` for the web
 > service.
 
 **Latest full green run: 193/193** (2026-08-26, APK support, all four suites against the freshly
@@ -222,8 +222,8 @@ described there was reversed on 2026-08-20**): `tests/BULGULAR-HTTPS.md`.
 Two separate stacks, two separate compose projects. Neither file knows about the other service.
 
 ```bash
-cd backend  && docker compose up -d --build     # project ipa-ota-backend,  api on :3000
-cd frontend && docker compose up -d --build     # project ipa-ota-frontend, web on :5173
+cd backend  && docker compose up -d --build     # project ipa-apk-backend,  api on :3000
+cd frontend && docker compose up -d --build     # project ipa-apk-frontend, web on :5173
 
 cd backend && docker compose logs -f api
 cd backend && docker compose stop api && npm run dev   # avoid port 3000 collision
@@ -231,7 +231,7 @@ cd backend && docker compose stop api && npm run dev   # avoid port 3000 collisi
 
 Compose project names are pinned via the top-level `name:` key in each file. Without it compose
 would derive the project from the directory (`backend`, `frontend`). Containers are named
-`ipa-ota-api` and `ipa-ota-web`.
+`ipa-apk-api` and `ipa-apk-web`.
 
 **Port 3000 collision is silent on macOS.** A stray `npm run dev` in `backend/` and the api
 container can both appear to listen (IPv4 vs IPv6), and requests hit whichever wins. If test
@@ -264,7 +264,7 @@ Since 2026-08-13 the separation is structural, not just conventional. Each servi
 | manifest + lockfile | `backend/package.json`, `backend/package-lock.json` | `frontend/package.json`, `frontend/package-lock.json` |
 | `node_modules` | `backend/node_modules` | `frontend/node_modules` |
 | TS config | `backend/tsconfig.json` (self-contained; base was inlined) | `frontend/tsconfig.json` (already was) |
-| compose | `backend/docker-compose.yml`, project `ipa-ota-backend` | `frontend/docker-compose.yml`, project `ipa-ota-frontend` |
+| compose | `backend/docker-compose.yml`, project `ipa-apk-backend` | `frontend/docker-compose.yml`, project `ipa-apk-frontend` |
 | image build context | `backend/` | `frontend/` |
 | compose env | `backend/.env` | `frontend/.env` |
 | data | `backend/data-docker/` (bind mount) | none — stateless |
