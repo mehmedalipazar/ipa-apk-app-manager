@@ -22,7 +22,7 @@ deployment, env, or link-lifetime behavior.
 
 > **Under version control since 2026-08-10.** Code can be rolled back via git, but **data cannot**:
 > `backend/data-docker/` and `backend/data/` are gitignored — back them up separately before
-> destructive operations. The pre-v2 source tree is archived at `../ipa-ota-download-v1-yedek/`.
+> destructive operations.
 
 ## Commands
 
